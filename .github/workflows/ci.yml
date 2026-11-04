@@ -1,0 +1,38 @@
+# CI: type-check, lint, unit tests, build, then the database-permission and end-to-end suites
+# against a throwaway local Supabase-compatible stack (PostgreSQL 16 + Supabase Auth + PostgREST).
+# Never uses real credentials or the production Supabase project.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx next typegen
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npx vitest run tests/unit
+
+      - name: Start local stack (PostgreSQL 16 + Auth + PostgREST)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-16 >/dev/null
+          sudo systemctl stop postgresql || true
+          PG_RUN_AS=postgres sudo -E bash scripts/local-stack/stack.sh setup
+          sudo -E bash scripts/local-stack/stack.sh start < /dev/null > /tmp/stack.log 2>&1
+          node scripts/local-stack/gen-env.mjs
+          node scripts/db/migrate.mjs --reset --seed
+      - run: npx vitest run tests/db
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-report, path: test-results, retention-days: 7 }

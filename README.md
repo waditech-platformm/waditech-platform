@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WadiTech Academy Platform
 
-## Getting Started
+**WadiTech Academy for AI & Robotics** — LEARN · BUILD · INNOVATE
 
-First, run the development server:
+A new, separate, full-stack EdTech platform: public academy website, LMS, student / trainer / parent / school / admin portals, virtual labs, AI learning assistant, certificates with public verification, and a sandbox payment flow. English (default) and Arabic with full RTL.
+
+> **Isolation.** This repository is independent of the existing waditech.co website and its Supabase project. Nothing here connects to production DNS, hosting, the production database or existing user accounts. See `docs/RELEASE_READINESS.md` for what requires approval before any launch.
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Web app | Next.js 16 (App Router, Server Components, Server Actions, `proxy.ts`), React 19, TypeScript strict |
+| UI | Tailwind CSS 4, Lucide icons, Inter + Cairo (self-hosted via Fontsource) |
+| Data & auth | Supabase: PostgreSQL 16, Supabase Auth, Row-Level Security on every table, versioned SQL migrations |
+| Validation | Zod on every form, route handler and environment variable |
+| Payments | Provider adapter: `sandbox` (default) and HyperPay (test endpoint; live disabled) |
+| AI | Provider adapter: `local` (free, no LLM) by default; Anthropic / OpenAI only when `AI_PAID_ENABLED=true` |
+| Tests | Vitest (unit + database permissions), Playwright (end-to-end) |
+
+Architecture: a **modular monolith**. UI in `app/` and `components/`, feature modules in `features/<module>/` (actions, queries, UI), server-only services in `server/` (payments, AI, storage, rate limiting), and the database as the final authority for permissions.
+
+## Run it locally
+
+Requirements: Node 22, PostgreSQL 16 binaries (`/usr/lib/postgresql/16/bin`), `curl`. No Docker needed.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run stack:setup      # downloads Supabase Auth (GoTrue) + PostgREST, creates a local Postgres cluster
+npm run stack:start      # Postgres :54322, gateway :54321 (/auth/v1, /rest/v1, /__mail)
+npm run env:local        # writes .env.local with LOCAL-only keys
+npm run db:reset         # applies supabase/migrations/* and the fictional seed
+npm run dev              # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+If you have Docker you can instead run the official Supabase CLI (`supabase start`) and `supabase db push`; the migrations are plain SQL compatible with both.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Demo accounts** (fictional, local only), password `Demo-Pass-2026!`:
+`superadmin@`, `admin@`, `trainer@`, `trainer2@`, `student@` (Omar), `student2@` (Sara), `student3@` (Yazan), `parent@` (linked to Omar), `parent2@` (unlinked), `coordinator@` — all `…@demo.waditech.local`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Emails sent by Supabase Auth in development (verification, password reset) are captured at `http://127.0.0.1:54321/__mail`.
 
-## Learn More
+## Tests
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm test                 # unit + database-permission tests (needs the local stack for tests/db)
+npm run test:e2e         # Playwright end-to-end journeys (starts `npm run start` if no server is running)
+npm run check            # typecheck + lint + tests
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+See `docs/TEST_PLAN.md` for what each suite covers and the latest verified results.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Documentation
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Doc | Contents |
+|---|---|
+| `docs/PRODUCT_REQUIREMENTS.md` | Users, journeys, scope, acceptance criteria |
+| `docs/SYSTEM_ARCHITECTURE.md` | Modules, data flow, boundaries, extension points |
+| `docs/DATABASE_SCHEMA.md` | Generated from the live schema (tables, policies, functions) |
+| `docs/DESIGN_SYSTEM.md` | Tokens, typography, components, RTL rules, imagery |
+| `docs/API_CONTRACTS.md` | Route handlers, server actions, database RPCs |
+| `docs/SECURITY_MODEL.md` | Threat model, authorization matrix, controls |
+| `docs/IMPLEMENTATION_ROADMAP.md` | Phase status using Not Started / In Progress / Implemented / Tested / Blocked / Pending Approval |
+| `docs/TEST_PLAN.md` | Test strategy and results |
+| `docs/DEPLOYMENT.md` | How a future, approved staging/production release would work |
+| `docs/RELEASE_READINESS.md` | Honest readiness report and approvals needed |
+| `CHANGELOG.md` | Change history |

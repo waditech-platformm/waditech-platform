@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local docker-free supabase stack (binaries, data, logs)
+.local-stack/
+test-results/
+playwright-report/
+.env*.local
+public/uploads/

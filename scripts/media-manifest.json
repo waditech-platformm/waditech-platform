@@ -1,0 +1,176 @@
+[
+ {
+  "name": "competition-22",
+  "cat": "competition",
+  "w": 1200,
+  "h": 1600
+ },
+ {
+  "name": "competition-29",
+  "cat": "competition",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "competition-31",
+  "cat": "competition",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "competition-46",
+  "cat": "competition",
+  "w": 1600,
+  "h": 1066
+ },
+ {
+  "name": "competition-47",
+  "cat": "competition",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "competition-61",
+  "cat": "competition",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "competition-65",
+  "cat": "competition",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "competition-23",
+  "cat": "competition",
+  "w": 1200,
+  "h": 1600
+ },
+ {
+  "name": "classroom-01",
+  "cat": "classroom",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "classroom-40",
+  "cat": "classroom",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "classroom-41",
+  "cat": "classroom",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "classroom-49",
+  "cat": "classroom",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "classroom-52",
+  "cat": "classroom",
+  "w": 1600,
+  "h": 1008
+ },
+ {
+  "name": "classroom-58",
+  "cat": "classroom",
+  "w": 1440,
+  "h": 1440
+ },
+ {
+  "name": "classroom-59",
+  "cat": "classroom",
+  "w": 1440,
+  "h": 1440
+ },
+ {
+  "name": "projects-12",
+  "cat": "projects",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "projects-14",
+  "cat": "projects",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "projects-16",
+  "cat": "projects",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "projects-18",
+  "cat": "projects",
+  "w": 739,
+  "h": 1277
+ },
+ {
+  "name": "projects-20",
+  "cat": "projects",
+  "w": 1280,
+  "h": 720
+ },
+ {
+  "name": "projects-34",
+  "cat": "projects",
+  "w": 1200,
+  "h": 1600
+ },
+ {
+  "name": "projects-36",
+  "cat": "projects",
+  "w": 1200,
+  "h": 1600
+ },
+ {
+  "name": "projects-42",
+  "cat": "projects",
+  "w": 1200,
+  "h": 1600
+ },
+ {
+  "name": "projects-44",
+  "cat": "projects",
+  "w": 1200,
+  "h": 1600
+ },
+ {
+  "name": "projects-45",
+  "cat": "projects",
+  "w": 960,
+  "h": 1280
+ },
+ {
+  "name": "projects-51",
+  "cat": "projects",
+  "w": 1600,
+  "h": 721
+ },
+ {
+  "name": "projects-64",
+  "cat": "projects",
+  "w": 1600,
+  "h": 1200
+ },
+ {
+  "name": "lab-classroom",
+  "cat": "brand",
+  "w": 1672,
+  "h": 941
+ },
+ {
+  "name": "lab-entrance",
+  "cat": "brand",
+  "w": 1672,
+  "h": 941
+ }
+]
