@@ -25,27 +25,34 @@ export type Env = z.infer<typeof schema>;
 let cached: Env | null = null;
 export function env(): Env {
   if (cached) return cached;
+  // Treat empty values (e.g. a variable saved blank in the hosting dashboard) as "not set".
+  const v = (k: string) => {
+    const x = process.env[k];
+    return x === undefined || x.trim() === "" ? undefined : x.trim();
+  };
   const parsed = schema.safeParse({
-    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    APP_ENV: process.env.APP_ENV,
-    PAYMENTS_PROVIDER: process.env.PAYMENTS_PROVIDER,
-    PAYMENTS_SANDBOX_SECRET: process.env.PAYMENTS_SANDBOX_SECRET,
-    HYPERPAY_BASE_URL: process.env.HYPERPAY_BASE_URL,
-    HYPERPAY_ACCESS_TOKEN: process.env.HYPERPAY_ACCESS_TOKEN,
-    HYPERPAY_ENTITY_ID_VISA_MASTER: process.env.HYPERPAY_ENTITY_ID_VISA_MASTER,
-    HYPERPAY_LIVE_ENABLED: process.env.HYPERPAY_LIVE_ENABLED,
-    AI_PROVIDER: process.env.AI_PROVIDER,
-    AI_API_KEY: process.env.AI_API_KEY,
-    AI_MODEL: process.env.AI_MODEL,
-    AI_DAILY_LIMIT: process.env.AI_DAILY_LIMIT,
-    AI_PAID_ENABLED: process.env.AI_PAID_ENABLED,
-    DEV_MAIL_URL: process.env.DEV_MAIL_URL,
+    NEXT_PUBLIC_SITE_URL: v("NEXT_PUBLIC_SITE_URL"),
+    NEXT_PUBLIC_SUPABASE_URL: v("NEXT_PUBLIC_SUPABASE_URL"),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: v("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    SUPABASE_SERVICE_ROLE_KEY: v("SUPABASE_SERVICE_ROLE_KEY"),
+    APP_ENV: v("APP_ENV"),
+    PAYMENTS_PROVIDER: v("PAYMENTS_PROVIDER"),
+    PAYMENTS_SANDBOX_SECRET: v("PAYMENTS_SANDBOX_SECRET"),
+    HYPERPAY_BASE_URL: v("HYPERPAY_BASE_URL"),
+    HYPERPAY_ACCESS_TOKEN: v("HYPERPAY_ACCESS_TOKEN"),
+    HYPERPAY_ENTITY_ID_VISA_MASTER: v("HYPERPAY_ENTITY_ID_VISA_MASTER"),
+    HYPERPAY_LIVE_ENABLED: v("HYPERPAY_LIVE_ENABLED"),
+    AI_PROVIDER: v("AI_PROVIDER"),
+    AI_API_KEY: v("AI_API_KEY"),
+    AI_MODEL: v("AI_MODEL"),
+    AI_DAILY_LIMIT: v("AI_DAILY_LIMIT"),
+    AI_PAID_ENABLED: v("AI_PAID_ENABLED"),
+    DEV_MAIL_URL: v("DEV_MAIL_URL"),
   });
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    // Logged server-side only (visible in the hosting provider's runtime logs); never sent to browsers.
+    console.error(`[env] Invalid environment configuration — ${issues}`);
     throw new Error(`Invalid environment configuration — ${issues}. See .env.example`);
   }
   if (parsed.data.APP_ENV === "production" && parsed.data.PAYMENTS_PROVIDER === "sandbox") {
