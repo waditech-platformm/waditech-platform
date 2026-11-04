@@ -22,21 +22,30 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 2) refresh the Supabase session cookie
-  let res = NextResponse.next({ request: req });
+  // 2) per-request Content-Security-Policy with a nonce (Next.js applies it to its own scripts)
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = contentSecurityPolicy(nonce);
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
+  const next = () => NextResponse.next({ request: { headers: requestHeaders } });
+
+  // 3) refresh the Supabase session cookie
+  let res = next();
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
       getAll: () => req.cookies.getAll(),
       setAll: (list) => {
         list.forEach(({ name, value }) => req.cookies.set(name, value));
-        res = NextResponse.next({ request: req });
+        requestHeaders.set("cookie", req.headers.get("cookie") ?? "");
+        res = next();
         list.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
       },
     },
   });
   const { data } = await supabase.auth.getClaims();
 
-  // 3) coarse gate for portal areas (fine-grained role checks happen server-side in each page + RLS)
+  // 4) coarse gate for portal areas (fine-grained role checks happen server-side in each page + RLS)
   const rest = pathname.slice(seg.length + 1) || "/";
   if (!data?.claims && PROTECTED.some((p) => rest === p || rest.startsWith(p + "/"))) {
     const url = req.nextUrl.clone();
@@ -51,7 +60,36 @@ export async function proxy(req: NextRequest) {
   if (!isPrefetch && req.cookies.get("wt_locale")?.value !== seg) {
     res.cookies.set("wt_locale", seg, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
   }
+  res.headers.set("Content-Security-Policy", csp);
   return res;
+}
+
+/** Strict CSP: scripts only from this origin with the request nonce (+ scripts they load, e.g. the HyperPay widget). */
+function contentSecurityPolicy(nonce: string) {
+  const dev = process.env.NODE_ENV === "development";
+  let supabase = "";
+  try {
+    const u = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+    supabase = `${u.origin} ${u.protocol === "https:" ? "wss" : "ws"}://${u.host}`;
+  } catch {}
+  const hyperpay = "https://eu-test.oppwa.com https://eu-prod.oppwa.com";
+  const directives = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src 'self' data: blob: ${supabase.split(" ")[0] ?? ""} ${hyperpay}`.trim(),
+    `media-src 'self' blob: ${supabase.split(" ")[0] ?? ""}`.trim(),
+    "font-src 'self' data:",
+    `connect-src 'self' ${supabase} ${hyperpay}`.trim(),
+    `frame-src ${hyperpay}`,
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    `form-action 'self' ${hyperpay}`,
+    "frame-ancestors 'self'",
+  ];
+  if (process.env.APP_ENV === "production" || process.env.APP_ENV === "staging") directives.push("upgrade-insecure-requests");
+  return directives.join("; ");
 }
 
 export const config = {

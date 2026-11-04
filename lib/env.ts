@@ -19,6 +19,11 @@ const schema = z.object({
   AI_DAILY_LIMIT: z.coerce.number().int().positive().default(30),
   AI_PAID_ENABLED: z.enum(["true", "false"]).default("false"),
   DEV_MAIL_URL: z.string().url().optional(),
+  EMAIL_PROVIDER: z.enum(["none", "smtp", "resend"]).default("none"),
+  EMAIL_FROM: z.string().min(3).optional(),
+  SMTP_URL: z.string().regex(/^smtps?:\/\//, "smtp url").optional(),
+  RESEND_API_KEY: z.string().min(10).optional(),
+  CRON_SECRET: z.string().min(16).optional(),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -48,6 +53,11 @@ export function env(): Env {
     AI_DAILY_LIMIT: v("AI_DAILY_LIMIT"),
     AI_PAID_ENABLED: v("AI_PAID_ENABLED"),
     DEV_MAIL_URL: v("DEV_MAIL_URL"),
+    EMAIL_PROVIDER: v("EMAIL_PROVIDER"),
+    EMAIL_FROM: v("EMAIL_FROM"),
+    SMTP_URL: v("SMTP_URL"),
+    RESEND_API_KEY: v("RESEND_API_KEY"),
+    CRON_SECRET: v("CRON_SECRET"),
   });
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");

@@ -123,7 +123,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
               <p className="mt-3 text-muted">{d.home.schoolsBody}</p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <ButtonLink href={p("/contact?topic=schools")}>{d.home.schoolsCta}{arrow}</ButtonLink>
-                <ButtonLink href={p("/schools")} variant="secondary">{d.common.learnMore}</ButtonLink>
+                <ButtonLink href={p("/schools")} variant="secondary">{d.home.learnAboutSchools}</ButtonLink>
               </div>
             </div>
             <div className="relative min-h-64"><Image src="/media/photos/classroom-41.webp" alt="" fill sizes="(min-width:1024px) 50vw, 100vw" className="object-cover" /></div>

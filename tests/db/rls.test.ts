@@ -229,3 +229,37 @@ describe("sign-up bootstrap", () => {
     }
   });
 });
+
+describe("email queue", () => {
+  it("queues an email for every new notification", async () => {
+    const c = await pool.connect();
+    try {
+      await c.query("begin");
+      const r = await c.query("insert into notifications(user_id, kind, title_en, title_ar) values ($1,'test','T','ت') returning email_status, email_next_attempt_at", [U.omar]);
+      expect(r.rows[0].email_status).toBe("queued");
+      expect(r.rows[0].email_next_attempt_at).not.toBeNull();
+    } finally {
+      await c.query("rollback");
+      c.release();
+    }
+  });
+  it("only the service role can claim or report emails (users and admins cannot)", async () => {
+    for (const who of [U.omar, U.admin, "anon"]) {
+      await as(who, async (q) => {
+        await refused(q, "select * from claim_notification_emails(5)");
+        await refused(q, "select report_notification_email('00000000-0000-4000-a000-000000000001', true)");
+      });
+    }
+  });
+  it("admins can read analytics; others cannot", async () => {
+    await as(U.admin, async (q) => {
+      const a = (await q("select admin_analytics() a")).rows[0].a;
+      expect(a.enrollments_by_week).toHaveLength(12);
+      expect(a.revenue_by_month).toHaveLength(6);
+      expect(Array.isArray(a.courses)).toBe(true);
+    });
+    await as(U.trainer, async (q) => {
+      await refused(q, "select admin_analytics()");
+    });
+  });
+});

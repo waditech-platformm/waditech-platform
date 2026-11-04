@@ -25,6 +25,10 @@ PAYMENTS_PROVIDER=sandbox
 PAYMENTS_SANDBOX_SECRET=${crypto.randomBytes(24).toString("hex")}
 AI_PROVIDER=local
 DEV_MAIL_URL=http://127.0.0.1:54321/__mail
+EMAIL_PROVIDER=smtp
+SMTP_URL=smtp://dev:dev@127.0.0.1:54325
+EMAIL_FROM=WadiTech Academy (DEV) <no-reply@waditech.local>
+CRON_SECRET=${crypto.randomBytes(24).toString("hex")}
 `;
 fs.writeFileSync(file, env);
 console.log(`wrote ${file}`);

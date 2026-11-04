@@ -13,7 +13,7 @@ export default async function AdminLayout({ children, params }: LayoutProps<"/[l
   const viewer = await requireViewer(locale, "trainer", `/${locale}/admin`);
   const a = (s: string) => `/${locale}/admin${s}`;
   const nav = isAdminRole(viewer.roles) ? [
-    { href: a(""), label: d.admin.overview, exact: true }, { href: a("/users"), label: d.admin.users }, { href: a("/courses"), label: d.admin.courses },
+    { href: a(""), label: d.admin.overview, exact: true }, { href: a("/analytics"), label: d.admin.analytics }, { href: a("/users"), label: d.admin.users }, { href: a("/courses"), label: d.admin.courses },
     { href: a("/enrollments"), label: d.admin.enrollments }, { href: a("/certificates"), label: d.admin.certificates }, { href: a("/news"), label: d.admin.news },
     { href: a("/events"), label: d.admin.events }, { href: a("/competitions"), label: d.admin.competitions }, { href: a("/scholarships"), label: d.admin.scholarships },
     { href: a("/labs"), label: d.admin.labs }, { href: a("/media"), label: d.admin.media }, { href: a("/payments"), label: d.admin.payments },

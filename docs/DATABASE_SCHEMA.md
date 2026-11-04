@@ -14,6 +14,7 @@ PostgreSQL 16 on Supabase. 45 tables, all with Row-Level Security enabled: **yes
 - `20261104000600_public_helpers.sql`
 - `20261104000700_profile_relations.sql`
 - `20261104000800_trainer_scope.sql`
+- `20261104000900_email_and_analytics.sql`
 
 ## Enumerations
 
@@ -277,7 +278,7 @@ Policies: `contact_admin` (SELECT → authenticated), `contact_admin_update` (UP
 | Column | Type | Null | Default | References |
 |---|---|---|---|---|
 | course_id | uuid |  |  | public.courses |
-| trainer_id | uuid |  |  | public.profiles, auth.users |
+| trainer_id | uuid |  |  | auth.users, public.profiles |
 | is_lead | boolean |  | false |  |
 
 Policies: `ci_admin` (ALL → authenticated), `ci_select` (SELECT → anon,authenticated)
@@ -585,6 +586,7 @@ Policies: `news_admin` (ALL → authenticated), `news_public` (SELECT → anon,a
 | email_attempts | integer |  | 0 |  |
 | email_last_error | text | yes |  |  |
 | created_at | timestamp with time zone |  | now() |  |
+| email_next_attempt_at | timestamp with time zone | yes |  |  |
 
 Policies: `notifications_mark_read` (UPDATE → authenticated), `notifications_own` (SELECT → authenticated)
 
@@ -618,7 +620,7 @@ Policies: `orders_select` (SELECT → authenticated)
 | Column | Type | Null | Default | References |
 |---|---|---|---|---|
 | organization_id | uuid |  |  | public.organizations |
-| user_id | uuid |  |  | public.profiles, auth.users |
+| user_id | uuid |  |  | auth.users, public.profiles |
 | member_role | org_member_role |  |  |  |
 | created_at | timestamp with time zone |  | now() |  |
 
@@ -759,7 +761,7 @@ Policies: _none — no direct client access (writes via SECURITY DEFINER functio
 |---|---|---|---|---|
 | id | uuid |  | extensions.gen_random_uuid() |  |
 | scholarship_id | uuid |  |  | public.scholarships |
-| applicant_id | uuid |  |  | public.profiles, auth.users |
+| applicant_id | uuid |  |  | auth.users, public.profiles |
 | student_name | text |  |  |  |
 | statement | text |  |  |  |
 | status | text |  | 'submitted'::text |  |
@@ -797,7 +799,7 @@ Policies: `scholarships_admin` (ALL → authenticated), `scholarships_public` (S
 | Column | Type | Null | Default | References |
 |---|---|---|---|---|
 | id | uuid |  | extensions.gen_random_uuid() |  |
-| student_id | uuid |  |  | public.profiles, auth.users |
+| student_id | uuid |  |  | auth.users, public.profiles |
 | course_id | uuid | yes |  | public.courses |
 | title | text |  |  |  |
 | description | text | yes |  |  |
@@ -849,6 +851,7 @@ SECURITY DEFINER functions run with elevated rights but always re-check the call
 
 | Function | Arguments | Security definer |
 |---|---|---|
+| `admin_analytics` | — | yes |
 | `admin_find_user_by_email` | p_email text | yes |
 | `admin_list_users` | p_search text, p_role app_role, p_limit integer, p_offset integer | yes |
 | `admin_overview` | — | yes |
@@ -857,6 +860,7 @@ SECURITY DEFINER functions run with elevated rights but always re-check the call
 | `audit_row` | — | yes |
 | `broadcast_announcement` | p_role app_role, p_title_en text, p_title_ar text, p_body_en text, p_body_ar text, p_link text | yes |
 | `can_view_student` | student uuid, uid uuid | yes |
+| `claim_notification_emails` | p_limit integer | yes |
 | `complete_lesson` | p_lesson uuid | yes |
 | `coordinates_student` | student uuid, uid uuid | yes |
 | `course_outline` | p_course uuid | yes |
@@ -897,9 +901,11 @@ SECURITY DEFINER functions run with elevated rights but always re-check the call
 | `notify_enrollment` | — | yes |
 | `notify_grade` | — | yes |
 | `public_projects` | p_limit integer | yes |
+| `queue_notification_email` | — |  |
 | `rate_limit_hit` | p_bucket text, p_limit integer, p_window_seconds integer | yes |
 | `record_payment_result` | p_order uuid, p_provider text, p_reference text, p_amount numeric, p_currency currency_code, p_succeeded boolean, p_result_code text, p_result_description text, p_is_sandbox boolean | yes |
 | `register_for_event` | p_event uuid, p_attendee_name text | yes |
+| `report_notification_email` | p_id uuid, p_ok boolean, p_error text | yes |
 | `request_parent_link` | p_code text | yes |
 | `review_attempt` | p_attempt uuid, p_points jsonb, p_feedback text | yes |
 | `revoke_certificate` | p_id uuid, p_reason text | yes |
