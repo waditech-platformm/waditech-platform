@@ -16,5 +16,12 @@ export async function GET(req: NextRequest) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (!error) return NextResponse.redirect(new URL(type === "recovery" ? `/${locale}/reset-password` : next, url.origin));
   }
+  // Fallback for Supabase's default email templates, which redirect here with a PKCE `code`.
+  const code = url.searchParams.get("code");
+  if (code) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) return NextResponse.redirect(new URL(url.searchParams.get("type") === "recovery" ? `/${locale}/reset-password` : next, url.origin));
+  }
   return NextResponse.redirect(new URL(`/${locale}/login?error=link`, url.origin));
 }

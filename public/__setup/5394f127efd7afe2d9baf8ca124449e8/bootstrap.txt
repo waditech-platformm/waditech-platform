@@ -1,0 +1,2427 @@
+-- WadiTech staging bootstrap (generated). Fictional demo data only.
+create schema if not exists supabase_migrations;
+create table if not exists supabase_migrations.schema_migrations (version text primary key, name text, applied_at timestamptz default now());
+
+-- ===== 20261104000100_identity.sql
+-- =====================================================================
+-- WadiTech Academy — 0001 Identity, roles, organizations, family links
+-- =====================================================================
+-- Conventions
+--  * Every table has RLS enabled. Default = deny.
+--  * Privileged logic lives in SECURITY DEFINER functions with a fixed search_path.
+--  * is_test_data marks fictional seed rows so they are never mistaken for real records.
+
+create type public.app_role as enum ('super_admin','admin','trainer','student','parent','school_coordinator');
+create type public.account_status as enum ('active','suspended','deactivated');
+
+-- ---------------------------------------------------------------------
+-- Generic helpers
+-- ---------------------------------------------------------------------
+create or replace function public.set_updated_at() returns trigger
+language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end $$;
+
+create or replace function public.is_service_role() returns boolean
+language sql stable as $$
+  -- service-role API key, OR a direct trusted DB session (migrations / seed) that carries no end-user JWT.
+  -- NOTE: uses session_user (not current_user) so SECURITY DEFINER functions cannot spoof it.
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', '') = 'service_role'
+      or (session_user in ('postgres','supabase_admin','supabase_auth_admin')
+          and coalesce(nullif(current_setting('request.jwt.claims', true), ''), '') = '');
+$$;
+
+-- ---------------------------------------------------------------------
+-- Profiles
+-- ---------------------------------------------------------------------
+create table public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text not null default '' check (char_length(full_name) <= 120),
+  preferred_locale text not null default 'en' check (preferred_locale in ('en','ar')),
+  phone text check (phone is null or char_length(phone) <= 32),
+  date_of_birth date,
+  avatar_url text,
+  bio text check (bio is null or char_length(bio) <= 1000),
+  account_status public.account_status not null default 'active',
+  -- short code a student shares with a parent to request a family link (not a secret credential)
+  family_link_code text not null unique default upper(substr(replace(extensions.gen_random_uuid()::text,'-',''),1,8)),
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create trigger profiles_updated_at before update on public.profiles for each row execute function public.set_updated_at();
+
+create table public.user_roles (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role public.app_role not null,
+  granted_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, role)
+);
+create index user_roles_role_idx on public.user_roles(role);
+
+-- Role helpers (SECURITY DEFINER so policies can call them without recursion)
+create or replace function public.has_role(r public.app_role, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.user_roles where user_id = uid and role = r);
+$$;
+
+create or replace function public.is_admin(uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.user_roles where user_id = uid and role in ('admin','super_admin'))
+     and exists (select 1 from public.profiles where id = uid and account_status = 'active');
+$$;
+
+create or replace function public.is_super_admin(uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.user_roles where user_id = uid and role = 'super_admin')
+     and exists (select 1 from public.profiles where id = uid and account_status = 'active');
+$$;
+
+create or replace function public.is_active_user(uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = uid and account_status = 'active');
+$$;
+
+-- ---------------------------------------------------------------------
+-- Audit log (append-only)
+-- ---------------------------------------------------------------------
+create table public.audit_logs (
+  id bigint generated always as identity primary key,
+  actor_id uuid,
+  action text not null,
+  entity_type text not null,
+  entity_id text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index audit_logs_created_idx on public.audit_logs(created_at desc);
+create index audit_logs_entity_idx on public.audit_logs(entity_type, entity_id);
+
+create or replace function public.write_audit(p_action text, p_entity_type text, p_entity_id text, p_metadata jsonb default '{}'::jsonb)
+returns void language sql security definer set search_path = public as $$
+  insert into public.audit_logs(actor_id, action, entity_type, entity_id, metadata)
+  values (auth.uid(), p_action, p_entity_type, p_entity_id, coalesce(p_metadata,'{}'::jsonb));
+$$;
+revoke execute on function public.write_audit(text,text,text,jsonb) from public, anon;
+
+-- Generic row audit trigger
+create or replace function public.audit_row() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_id text;
+begin
+  v_id := coalesce(to_jsonb(new) ->> 'id', to_jsonb(old) ->> 'id',
+                   to_jsonb(new) ->> 'user_id', to_jsonb(old) ->> 'user_id');
+  insert into public.audit_logs(actor_id, action, entity_type, entity_id, metadata)
+  values (auth.uid(), lower(tg_op), tg_table_name, v_id,
+          case when tg_op = 'UPDATE' then jsonb_build_object('status_before', to_jsonb(old) ->> 'status', 'status_after', to_jsonb(new) ->> 'status')
+               when tg_op = 'DELETE' then jsonb_build_object('deleted', true)
+               else '{}'::jsonb end);
+  return coalesce(new, old);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- New auth user -> profile + SAFE default role
+-- Only 'student' or 'parent' can ever be chosen at signup. Everything else is ignored.
+-- ---------------------------------------------------------------------
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  v_type text := coalesce(new.raw_user_meta_data ->> 'account_type', 'student');
+  v_role public.app_role;
+  v_locale text := coalesce(new.raw_user_meta_data ->> 'locale', 'en');
+begin
+  v_role := case when v_type = 'parent' then 'parent'::public.app_role else 'student'::public.app_role end;
+  insert into public.profiles(id, full_name, preferred_locale)
+  values (new.id,
+          left(coalesce(new.raw_user_meta_data ->> 'full_name', ''), 120),
+          case when v_locale in ('en','ar') then v_locale else 'en' end);
+  insert into public.user_roles(user_id, role) values (new.id, v_role);
+  return new;
+end $$;
+
+create trigger on_auth_user_created after insert on auth.users
+for each row execute function public.handle_new_user();
+
+-- Protect sensitive profile columns from self-modification
+create or replace function public.guard_profile_update() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_service_role() or public.is_admin() then return new; end if;
+  if new.account_status is distinct from old.account_status
+     or new.family_link_code is distinct from old.family_link_code
+     or new.is_test_data is distinct from old.is_test_data
+     or new.id is distinct from old.id then
+    raise exception 'not allowed to change protected profile fields' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+create trigger profiles_guard before update on public.profiles for each row execute function public.guard_profile_update();
+
+-- Role changes: only admins; only super admins may grant/revoke admin or super_admin
+create or replace function public.guard_user_roles() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_role public.app_role := coalesce(new.role, old.role);
+begin
+  if public.is_service_role() then return coalesce(new, old); end if;
+  if not public.is_admin() then
+    raise exception 'only administrators can change roles' using errcode = '42501';
+  end if;
+  if v_role in ('admin','super_admin') and not public.is_super_admin() then
+    raise exception 'only super administrators can manage admin roles' using errcode = '42501';
+  end if;
+  if tg_op = 'DELETE' and old.user_id = auth.uid() and old.role in ('admin','super_admin') then
+    raise exception 'you cannot remove your own administrator role' using errcode = '42501';
+  end if;
+  if tg_op = 'INSERT' then new.granted_by := auth.uid(); end if;
+  return coalesce(new, old);
+end $$;
+create trigger user_roles_guard before insert or update or delete on public.user_roles
+for each row execute function public.guard_user_roles();
+create trigger user_roles_audit after insert or update or delete on public.user_roles
+for each row execute function public.audit_row();
+
+-- ---------------------------------------------------------------------
+-- Organizations (schools / institutions) — tenant boundary
+-- ---------------------------------------------------------------------
+create type public.org_type as enum ('school','university','company','community','other');
+create type public.org_member_role as enum ('coordinator','trainer','student');
+
+create table public.organizations (
+  id uuid primary key default extensions.gen_random_uuid(),
+  name text not null check (char_length(name) between 2 and 160),
+  name_ar text,
+  slug text not null unique check (slug ~ '^[a-z0-9-]{2,80}$'),
+  type public.org_type not null default 'school',
+  city text,
+  contact_email text,
+  contact_phone text,
+  status text not null default 'active' check (status in ('active','inactive')),
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create trigger organizations_updated_at before update on public.organizations for each row execute function public.set_updated_at();
+
+create table public.organization_members (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  member_role public.org_member_role not null,
+  created_at timestamptz not null default now(),
+  primary key (organization_id, user_id, member_role)
+);
+create index org_members_user_idx on public.organization_members(user_id);
+
+create or replace function public.is_org_coordinator(org uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.organization_members m
+                 join public.user_roles r on r.user_id = m.user_id and r.role = 'school_coordinator'
+                 where m.organization_id = org and m.user_id = uid and m.member_role = 'coordinator');
+$$;
+
+create or replace function public.is_org_member(org uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.organization_members where organization_id = org and user_id = uid);
+$$;
+
+-- coordinator of ANY org that the student belongs to
+create or replace function public.coordinates_student(student uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.organization_members s
+    join public.organization_members c on c.organization_id = s.organization_id
+    join public.user_roles r on r.user_id = c.user_id and r.role = 'school_coordinator'
+    where s.user_id = student and s.member_role = 'student'
+      and c.user_id = uid and c.member_role = 'coordinator');
+$$;
+
+-- ---------------------------------------------------------------------
+-- Parent <-> student links (must be VERIFIED before a parent sees anything)
+-- ---------------------------------------------------------------------
+create table public.parent_student_links (
+  id uuid primary key default extensions.gen_random_uuid(),
+  parent_id uuid not null references auth.users(id) on delete cascade,
+  student_id uuid not null references auth.users(id) on delete cascade,
+  relationship text not null default 'parent' check (relationship in ('parent','guardian')),
+  status text not null default 'pending' check (status in ('pending','verified','rejected','revoked')),
+  verified_by uuid references auth.users(id) on delete set null,
+  verified_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (parent_id, student_id),
+  check (parent_id <> student_id)
+);
+create index psl_student_idx on public.parent_student_links(student_id);
+
+create or replace function public.is_parent_of(student uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.parent_student_links
+                 where parent_id = uid and student_id = student and status = 'verified')
+     and public.has_role('parent', uid);
+$$;
+
+-- Parent requests a link with the student's family code. Admin verifies.
+create or replace function public.request_parent_link(p_code text) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_student uuid; v_id uuid;
+begin
+  if not public.has_role('parent') then raise exception 'only parent accounts can request links' using errcode='42501'; end if;
+  select p.id into v_student from public.profiles p
+    join public.user_roles r on r.user_id = p.id and r.role = 'student'
+    where p.family_link_code = upper(trim(p_code));
+  if v_student is null then raise exception 'invalid code' using errcode='P0002'; end if;
+  insert into public.parent_student_links(parent_id, student_id) values (auth.uid(), v_student)
+  on conflict (parent_id, student_id) do update set status = case when parent_student_links.status in ('rejected','revoked') then 'pending' else parent_student_links.status end
+  returning id into v_id;
+  perform public.write_audit('request','parent_student_links', v_id::text);
+  return v_id;
+end $$;
+
+create or replace function public.guard_parent_links() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_service_role() or public.is_admin() then
+    if new.status = 'verified' and old.status is distinct from 'verified' then
+      new.verified_by := auth.uid(); new.verified_at := now();
+    end if;
+    return new;
+  end if;
+  raise exception 'only administrators can change family links' using errcode='42501';
+end $$;
+create trigger psl_guard before update on public.parent_student_links for each row execute function public.guard_parent_links();
+create trigger psl_audit after insert or update or delete on public.parent_student_links for each row execute function public.audit_row();
+
+-- ---------------------------------------------------------------------
+-- RLS
+-- ---------------------------------------------------------------------
+alter table public.profiles enable row level security;
+alter table public.user_roles enable row level security;
+alter table public.audit_logs enable row level security;
+alter table public.organizations enable row level security;
+alter table public.organization_members enable row level security;
+alter table public.parent_student_links enable row level security;
+
+-- profiles: self, admins, verified parents, coordinators of the student's org.
+-- (trainer visibility added in the LMS migration once enrollments exist)
+create policy profiles_select on public.profiles for select to authenticated using (
+  id = auth.uid() or public.is_admin() or public.is_parent_of(id) or public.coordinates_student(id)
+);
+create policy profiles_update_self on public.profiles for update to authenticated
+  using (id = auth.uid() or public.is_admin()) with check (id = auth.uid() or public.is_admin());
+
+create policy user_roles_select on public.user_roles for select to authenticated using (user_id = auth.uid() or public.is_admin());
+create policy user_roles_admin_insert on public.user_roles for insert to authenticated with check (public.is_admin());
+create policy user_roles_admin_delete on public.user_roles for delete to authenticated using (public.is_admin());
+
+create policy audit_select on public.audit_logs for select to authenticated using (public.is_admin());
+-- no insert/update/delete policies: writes only through SECURITY DEFINER functions/triggers
+
+create policy orgs_select on public.organizations for select to authenticated using (public.is_admin() or public.is_org_member(id));
+create policy orgs_admin_all on public.organizations for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy orgs_coordinator_update on public.organizations for update to authenticated using (public.is_org_coordinator(id)) with check (public.is_org_coordinator(id));
+
+create policy org_members_select on public.organization_members for select to authenticated using (
+  user_id = auth.uid() or public.is_admin() or public.is_org_coordinator(organization_id));
+create policy org_members_admin_all on public.organization_members for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+create policy psl_select on public.parent_student_links for select to authenticated using (
+  parent_id = auth.uid() or student_id = auth.uid() or public.is_admin());
+create policy psl_admin_update on public.parent_student_links for update to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy psl_admin_delete on public.parent_student_links for delete to authenticated using (public.is_admin());
+
+insert into supabase_migrations.schema_migrations(version, name) values ('20261104000100', '20261104000100_identity.sql') on conflict do nothing;
+
+-- ===== 20261104000200_lms.sql
+-- =====================================================================
+-- WadiTech Academy — 0002 Catalog & LMS core
+-- programs (tracks) -> courses (enrollable offering) -> modules -> lessons
+-- =====================================================================
+create type public.publish_status as enum ('draft','published','archived');
+create type public.course_level as enum ('beginner','intermediate','advanced');
+create type public.delivery_mode as enum ('in_person','online','hybrid');
+create type public.availability as enum ('open','waitlist','closed','coming_soon');
+create type public.course_category as enum ('robotics','ai','programming','cybersecurity','electronics','embedded','iot','drones','3d_printing','stem');
+create type public.currency_code as enum ('JOD','USD');
+
+create table public.programs (
+  id uuid primary key default extensions.gen_random_uuid(),
+  slug text not null unique check (slug ~ '^[a-z0-9-]{2,80}$'),
+  title_en text not null, title_ar text not null,
+  summary_en text, summary_ar text,
+  category public.course_category not null,
+  cover_url text,
+  position int not null default 0,
+  status public.publish_status not null default 'draft',
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create trigger programs_updated_at before update on public.programs for each row execute function public.set_updated_at();
+
+create table public.courses (
+  id uuid primary key default extensions.gen_random_uuid(),
+  program_id uuid references public.programs(id) on delete set null,
+  slug text not null unique check (slug ~ '^[a-z0-9-]{2,80}$'),
+  title_en text not null check (char_length(title_en) between 3 and 160),
+  title_ar text not null check (char_length(title_ar) between 2 and 160),
+  summary_en text, summary_ar text,
+  description_en text, description_ar text,
+  category public.course_category not null,
+  level public.course_level not null default 'beginner',
+  delivery_mode public.delivery_mode not null default 'in_person',
+  availability public.availability not null default 'open',
+  age_min int check (age_min between 4 and 99),
+  age_max int check (age_max between 4 and 99),
+  duration_weeks int check (duration_weeks between 1 and 104),
+  hours_total int check (hours_total between 1 and 2000),
+  price_amount numeric(10,3) not null default 0 check (price_amount >= 0),
+  currency public.currency_code not null default 'JOD',
+  capacity int check (capacity is null or capacity > 0),
+  requires_approval boolean not null default false,
+  thumbnail_url text, cover_url text, preview_video_url text,
+  outcomes_en text[] not null default '{}', outcomes_ar text[] not null default '{}',
+  requirements_en text[] not null default '{}', requirements_ar text[] not null default '{}',
+  faqs jsonb not null default '[]'::jsonb,
+  featured boolean not null default false,
+  status public.publish_status not null default 'draft',
+  published_at timestamptz,
+  created_by uuid references auth.users(id) on delete set null,
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  check (age_max is null or age_min is null or age_max >= age_min)
+);
+create index courses_public_idx on public.courses(status, category, level);
+create index courses_program_idx on public.courses(program_id);
+create trigger courses_updated_at before update on public.courses for each row execute function public.set_updated_at();
+create trigger courses_audit after insert or update or delete on public.courses for each row execute function public.audit_row();
+
+create table public.course_instructors (
+  course_id uuid not null references public.courses(id) on delete cascade,
+  trainer_id uuid not null references auth.users(id) on delete cascade,
+  is_lead boolean not null default false,
+  primary key (course_id, trainer_id)
+);
+create index course_instructors_trainer_idx on public.course_instructors(trainer_id);
+
+create table public.course_modules (
+  id uuid primary key default extensions.gen_random_uuid(),
+  course_id uuid not null references public.courses(id) on delete cascade,
+  title_en text not null, title_ar text not null,
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index course_modules_course_idx on public.course_modules(course_id, position);
+
+create type public.lesson_type as enum ('video','text','resource','quiz','assignment','lab');
+create type public.completion_rule as enum ('view','video_90','quiz_pass','assignment_submitted','manual');
+
+create table public.lessons (
+  id uuid primary key default extensions.gen_random_uuid(),
+  module_id uuid not null references public.course_modules(id) on delete cascade,
+  course_id uuid not null references public.courses(id) on delete cascade,
+  title_en text not null, title_ar text not null,
+  type public.lesson_type not null default 'text',
+  body_en text, body_ar text,
+  video_url text,
+  duration_minutes int check (duration_minutes is null or duration_minutes between 1 and 600),
+  position int not null default 0,
+  is_preview boolean not null default false,
+  completion_rule public.completion_rule not null default 'view',
+  assessment_id uuid,
+  assignment_id uuid,
+  lab_id uuid,
+  status public.publish_status not null default 'published',
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create index lessons_module_idx on public.lessons(module_id, position);
+create index lessons_course_idx on public.lessons(course_id);
+create trigger lessons_updated_at before update on public.lessons for each row execute function public.set_updated_at();
+
+-- keep lessons.course_id consistent with its module
+create or replace function public.lesson_sync_course() returns trigger language plpgsql as $$
+begin
+  select course_id into new.course_id from public.course_modules where id = new.module_id;
+  return new;
+end $$;
+create trigger lessons_sync_course before insert or update of module_id on public.lessons for each row execute function public.lesson_sync_course();
+
+create table public.lesson_resources (
+  id uuid primary key default extensions.gen_random_uuid(),
+  lesson_id uuid not null references public.lessons(id) on delete cascade,
+  title text not null,
+  url text not null,
+  kind text not null default 'file' check (kind in ('file','link','code')),
+  position int not null default 0
+);
+
+-- ---------------------------------------------------------------------
+-- Enrollments
+-- ---------------------------------------------------------------------
+create type public.enrollment_status as enum ('pending_payment','pending_approval','active','completed','cancelled','refunded');
+
+create table public.enrollments (
+  id uuid primary key default extensions.gen_random_uuid(),
+  course_id uuid not null references public.courses(id) on delete restrict,
+  student_id uuid not null references auth.users(id) on delete cascade,
+  status public.enrollment_status not null,
+  source text not null default 'self' check (source in ('self','admin','school','scholarship','parent')),
+  organization_id uuid references public.organizations(id) on delete set null,
+  requested_by uuid references auth.users(id) on delete set null,
+  enrolled_at timestamptz not null default now(),
+  activated_at timestamptz,
+  completed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  unique (course_id, student_id)
+);
+create index enrollments_student_idx on public.enrollments(student_id);
+create index enrollments_course_idx on public.enrollments(course_id, status);
+create index enrollments_org_idx on public.enrollments(organization_id);
+create trigger enrollments_updated_at before update on public.enrollments for each row execute function public.set_updated_at();
+create trigger enrollments_audit after insert or update or delete on public.enrollments for each row execute function public.audit_row();
+
+create or replace function public.is_enrolled(course uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.enrollments where course_id = course and student_id = uid and status in ('active','completed'));
+$$;
+
+create or replace function public.is_course_instructor(course uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.course_instructors ci join public.user_roles r on r.user_id = ci.trainer_id and r.role = 'trainer'
+                 where ci.course_id = course and ci.trainer_id = uid);
+$$;
+
+create or replace function public.is_course_staff(course uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_admin(uid) or public.is_course_instructor(course, uid);
+$$;
+
+-- trainer teaches a course the student is enrolled in
+create or replace function public.teaches_student(student uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.enrollments e join public.course_instructors ci on ci.course_id = e.course_id
+                 join public.user_roles r on r.user_id = ci.trainer_id and r.role = 'trainer'
+                 where e.student_id = student and ci.trainer_id = uid);
+$$;
+
+-- Who may see a student's learning data
+create or replace function public.can_view_student(student uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select student = uid or public.is_admin(uid) or public.is_parent_of(student, uid)
+      or public.teaches_student(student, uid) or public.coordinates_student(student, uid);
+$$;
+
+-- Trainers may see profile basics of students they teach
+create policy profiles_select_trainer on public.profiles for select to authenticated using (public.teaches_student(id));
+
+-- Enrollment is created ONLY through this function (no direct insert policy for students).
+create or replace function public.enroll_in_course(p_course uuid, p_student uuid default null) returns public.enrollments
+language plpgsql security definer set search_path = public as $$
+declare
+  c public.courses; v_student uuid := coalesce(p_student, auth.uid());
+  v_count int; v_status public.enrollment_status; v_source text := 'self'; e public.enrollments;
+begin
+  if auth.uid() is null then raise exception 'authentication required' using errcode='42501'; end if;
+  if not public.is_active_user() then raise exception 'account is not active' using errcode='42501'; end if;
+  if v_student <> auth.uid() then
+    if public.is_parent_of(v_student) then v_source := 'parent';
+    elsif public.is_admin() then v_source := 'admin';
+    else raise exception 'not allowed to enroll this student' using errcode='42501'; end if;
+  end if;
+  if not public.has_role('student', v_student) then raise exception 'only student accounts can be enrolled' using errcode='42501'; end if;
+
+  select * into c from public.courses where id = p_course for update;
+  if c.id is null or c.status <> 'published' then raise exception 'course not available' using errcode='P0002'; end if;
+  if c.availability not in ('open') and v_source <> 'admin' then raise exception 'enrollment is not open for this course' using errcode='P0001'; end if;
+
+  select * into e from public.enrollments where course_id = p_course and student_id = v_student;
+  if e.id is not null and e.status not in ('cancelled','refunded') then return e; end if;
+
+  if c.capacity is not null then
+    select count(*) into v_count from public.enrollments where course_id = p_course and status in ('active','completed','pending_payment','pending_approval');
+    if v_count >= c.capacity then raise exception 'course is full' using errcode='P0001'; end if;
+  end if;
+
+  v_status := case when v_source = 'admin' then 'active'
+                   when c.price_amount > 0 then 'pending_payment'
+                   when c.requires_approval then 'pending_approval'
+                   else 'active' end;
+
+  if e.id is not null then
+    update public.enrollments set status = v_status, source = v_source, requested_by = auth.uid(),
+      activated_at = case when v_status = 'active' then now() end, enrolled_at = now()
+      where id = e.id returning * into e;
+  else
+    insert into public.enrollments(course_id, student_id, status, source, requested_by, activated_at)
+    values (p_course, v_student, v_status, v_source, auth.uid(), case when v_status = 'active' then now() end)
+    returning * into e;
+  end if;
+  return e;
+end $$;
+revoke execute on function public.enroll_in_course(uuid, uuid) from anon;
+
+-- Only staff may change enrollment status directly (payments go through service role)
+create or replace function public.guard_enrollment_update() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_service_role() or public.is_admin() then
+    if new.status = 'active' and old.status is distinct from 'active' then new.activated_at := coalesce(new.activated_at, now()); end if;
+    if new.status = 'completed' and old.status is distinct from 'completed' then new.completed_at := coalesce(new.completed_at, now()); end if;
+    return new;
+  end if;
+  -- trainers may mark completion of their course's enrollments
+  if public.is_course_instructor(old.course_id) and new.status = 'completed' and old.status = 'active'
+     and new.course_id = old.course_id and new.student_id = old.student_id then
+    new.completed_at := now(); return new;
+  end if;
+  -- students may cancel their own unpaid request
+  if old.student_id = auth.uid() and new.status = 'cancelled' and old.status in ('pending_payment','pending_approval')
+     and new.course_id = old.course_id and new.student_id = old.student_id then
+    return new;
+  end if;
+  raise exception 'not allowed to change this enrollment' using errcode='42501';
+end $$;
+create trigger enrollments_guard before update on public.enrollments for each row execute function public.guard_enrollment_update();
+
+-- ---------------------------------------------------------------------
+-- Progress & notes
+-- ---------------------------------------------------------------------
+create table public.lesson_progress (
+  student_id uuid not null references auth.users(id) on delete cascade,
+  lesson_id uuid not null references public.lessons(id) on delete cascade,
+  course_id uuid not null references public.courses(id) on delete cascade,
+  status text not null default 'in_progress' check (status in ('in_progress','completed')),
+  video_percent int not null default 0 check (video_percent between 0 and 100),
+  last_position_seconds int not null default 0 check (last_position_seconds >= 0),
+  completed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (student_id, lesson_id)
+);
+create index lesson_progress_course_idx on public.lesson_progress(student_id, course_id);
+
+create table public.lesson_notes (
+  id uuid primary key default extensions.gen_random_uuid(),
+  student_id uuid not null references auth.users(id) on delete cascade,
+  lesson_id uuid not null references public.lessons(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 5000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index lesson_notes_idx on public.lesson_notes(student_id, lesson_id);
+create trigger lesson_notes_updated_at before update on public.lesson_notes for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------------
+-- RLS
+-- ---------------------------------------------------------------------
+alter table public.programs enable row level security;
+alter table public.courses enable row level security;
+alter table public.course_instructors enable row level security;
+alter table public.course_modules enable row level security;
+alter table public.lessons enable row level security;
+alter table public.lesson_resources enable row level security;
+alter table public.enrollments enable row level security;
+alter table public.lesson_progress enable row level security;
+alter table public.lesson_notes enable row level security;
+
+create policy programs_public on public.programs for select to anon, authenticated using (status = 'published' or public.is_admin());
+create policy programs_admin on public.programs for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+create policy courses_public on public.courses for select to anon, authenticated
+  using (status = 'published' or public.is_course_staff(id));
+create policy courses_admin_insert on public.courses for insert to authenticated with check (public.is_admin());
+create policy courses_staff_update on public.courses for update to authenticated using (public.is_course_staff(id)) with check (public.is_course_staff(id));
+create policy courses_admin_delete on public.courses for delete to authenticated using (public.is_admin());
+
+create policy ci_select on public.course_instructors for select to anon, authenticated using (true);
+create policy ci_admin on public.course_instructors for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- curriculum outline (module titles) is public for published courses
+create policy modules_select on public.course_modules for select to anon, authenticated using (
+  exists (select 1 from public.courses c where c.id = course_id and c.status = 'published') or public.is_course_staff(course_id));
+create policy modules_staff on public.course_modules for all to authenticated using (public.is_course_staff(course_id)) with check (public.is_course_staff(course_id));
+
+-- lesson rows are visible as outline to everyone for published courses, but CONTENT is protected:
+-- we expose content columns only via the course_lesson_content() function / enrolled policy.
+create policy lessons_select on public.lessons for select to anon, authenticated using (
+  public.is_course_staff(course_id)
+  or (status = 'published' and exists (select 1 from public.courses c where c.id = course_id and c.status = 'published')
+      and (is_preview or public.is_enrolled(course_id))));
+create policy lessons_staff on public.lessons for all to authenticated using (public.is_course_staff(course_id)) with check (public.is_course_staff(course_id));
+
+-- public outline without protected content
+create or replace function public.course_outline(p_course uuid)
+returns table (lesson_id uuid, module_id uuid, title_en text, title_ar text, type public.lesson_type, duration_minutes int, lesson_position int, is_preview boolean)
+language sql stable security definer set search_path = public as $$
+  select l.id, l.module_id, l.title_en, l.title_ar, l.type, l.duration_minutes, l.position, l.is_preview
+  from public.lessons l join public.courses c on c.id = l.course_id
+  where l.course_id = p_course and l.status = 'published' and (c.status = 'published' or public.is_course_staff(c.id))
+  order by l.position;
+$$;
+
+create policy resources_select on public.lesson_resources for select to authenticated using (
+  exists (select 1 from public.lessons l where l.id = lesson_id and (public.is_course_staff(l.course_id) or public.is_enrolled(l.course_id))));
+create policy resources_staff on public.lesson_resources for all to authenticated using (
+  exists (select 1 from public.lessons l where l.id = lesson_id and public.is_course_staff(l.course_id)))
+  with check (exists (select 1 from public.lessons l where l.id = lesson_id and public.is_course_staff(l.course_id)));
+
+create policy enrollments_select on public.enrollments for select to authenticated using (
+  public.can_view_student(student_id) or public.is_course_staff(course_id)
+  or (organization_id is not null and public.is_org_coordinator(organization_id)));
+create policy enrollments_update on public.enrollments for update to authenticated using (
+  student_id = auth.uid() or public.is_course_staff(course_id)) with check (true);
+create policy enrollments_admin_insert on public.enrollments for insert to authenticated with check (public.is_admin());
+create policy enrollments_admin_delete on public.enrollments for delete to authenticated using (public.is_admin());
+
+create policy progress_select on public.lesson_progress for select to authenticated using (
+  public.can_view_student(student_id) or public.is_course_staff(course_id));
+-- writes go through track_lesson_progress() / complete_lesson()
+
+create policy notes_own on public.lesson_notes for all to authenticated
+  using (student_id = auth.uid()) with check (student_id = auth.uid() and public.is_enrolled((select course_id from public.lessons where id = lesson_id)));
+
+insert into supabase_migrations.schema_migrations(version, name) values ('20261104000200', '20261104000200_lms.sql') on conflict do nothing;
+
+-- ===== 20261104000300_assessments.sql
+-- =====================================================================
+-- WadiTech Academy — 0003 Assessments, assignments, attendance, progress rules
+-- Correct answers live in question_keys which students can never read.
+-- Grading happens ONLY in submit_attempt() on the server/database.
+-- =====================================================================
+
+-- trainers may edit teaching content of their course, but not commercial / publishing fields
+create or replace function public.guard_course_update() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_service_role() or public.is_admin() then
+    if new.status = 'published' and old.status is distinct from 'published' then new.published_at := coalesce(new.published_at, now()); end if;
+    return new;
+  end if;
+  if new.price_amount is distinct from old.price_amount or new.currency is distinct from old.currency
+     or new.status is distinct from old.status or new.slug is distinct from old.slug
+     or new.capacity is distinct from old.capacity or new.featured is distinct from old.featured
+     or new.availability is distinct from old.availability or new.is_test_data is distinct from old.is_test_data then
+    raise exception 'only administrators can change pricing, capacity or publishing' using errcode='42501';
+  end if;
+  return new;
+end $$;
+create trigger courses_guard before update on public.courses for each row execute function public.guard_course_update();
+
+create table public.assessments (
+  id uuid primary key default extensions.gen_random_uuid(),
+  course_id uuid not null references public.courses(id) on delete cascade,
+  title_en text not null, title_ar text not null,
+  description_en text, description_ar text,
+  pass_percent int not null default 60 check (pass_percent between 0 and 100),
+  max_attempts int check (max_attempts is null or max_attempts between 1 and 50),
+  time_limit_minutes int check (time_limit_minutes is null or time_limit_minutes between 1 and 600),
+  status public.publish_status not null default 'published',
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create index assessments_course_idx on public.assessments(course_id);
+create trigger assessments_updated_at before update on public.assessments for each row execute function public.set_updated_at();
+
+create type public.question_kind as enum ('single_choice','multiple_choice','short_answer');
+
+create table public.questions (
+  id uuid primary key default extensions.gen_random_uuid(),
+  assessment_id uuid not null references public.assessments(id) on delete cascade,
+  kind public.question_kind not null default 'single_choice',
+  prompt_en text not null, prompt_ar text not null,
+  explanation_en text, explanation_ar text,
+  points int not null default 1 check (points between 0 and 100),
+  position int not null default 0
+);
+create index questions_assessment_idx on public.questions(assessment_id, position);
+
+create table public.answer_options (
+  id uuid primary key default extensions.gen_random_uuid(),
+  question_id uuid not null references public.questions(id) on delete cascade,
+  label_en text not null, label_ar text not null,
+  position int not null default 0
+);
+create index answer_options_q_idx on public.answer_options(question_id, position);
+
+-- STAFF ONLY: the answer key
+create table public.question_keys (
+  question_id uuid primary key references public.questions(id) on delete cascade,
+  correct_option_ids uuid[] not null default '{}',
+  accepted_answers text[] not null default '{}',   -- short answer auto-grading only when explicitly configured
+  case_sensitive boolean not null default false
+);
+
+create table public.assessment_attempts (
+  id uuid primary key default extensions.gen_random_uuid(),
+  assessment_id uuid not null references public.assessments(id) on delete cascade,
+  student_id uuid not null references auth.users(id) on delete cascade,
+  course_id uuid not null references public.courses(id) on delete cascade,
+  attempt_number int not null,
+  status text not null default 'in_progress' check (status in ('in_progress','submitted','needs_review','graded')),
+  started_at timestamptz not null default now(),
+  submitted_at timestamptz,
+  score_points numeric(8,2), max_points numeric(8,2), score_percent numeric(5,2),
+  passed boolean,
+  reviewed_by uuid references auth.users(id) on delete set null,
+  feedback text,
+  unique (assessment_id, student_id, attempt_number)
+);
+create index attempts_student_idx on public.assessment_attempts(student_id, assessment_id);
+
+create table public.assessment_answers (
+  attempt_id uuid not null references public.assessment_attempts(id) on delete cascade,
+  question_id uuid not null references public.questions(id) on delete cascade,
+  selected_option_ids uuid[] not null default '{}',
+  text_answer text check (text_answer is null or char_length(text_answer) <= 4000),
+  is_correct boolean,
+  points_awarded numeric(8,2),
+  feedback text,
+  primary key (attempt_id, question_id)
+);
+
+-- Start (or resume) an attempt
+create or replace function public.start_attempt(p_assessment uuid) returns public.assessment_attempts
+language plpgsql security definer set search_path = public as $$
+declare a public.assessments; v_n int; t public.assessment_attempts;
+begin
+  select * into a from public.assessments where id = p_assessment and status = 'published';
+  if a.id is null then raise exception 'assessment not found' using errcode='P0002'; end if;
+  if not public.is_enrolled(a.course_id) then raise exception 'you are not enrolled in this course' using errcode='42501'; end if;
+  select * into t from public.assessment_attempts where assessment_id = a.id and student_id = auth.uid() and status = 'in_progress' limit 1;
+  if t.id is not null then return t; end if;
+  select count(*) into v_n from public.assessment_attempts where assessment_id = a.id and student_id = auth.uid();
+  if a.max_attempts is not null and v_n >= a.max_attempts then raise exception 'no attempts remaining' using errcode='P0001'; end if;
+  insert into public.assessment_attempts(assessment_id, student_id, course_id, attempt_number)
+  values (a.id, auth.uid(), a.course_id, v_n + 1) returning * into t;
+  return t;
+end $$;
+
+-- Submit + grade. p_answers: [{"question_id": "...", "option_ids": ["..."], "text": "..."}]
+create or replace function public.submit_attempt(p_attempt uuid, p_answers jsonb) returns public.assessment_attempts
+language plpgsql security definer set search_path = public as $$
+declare
+  t public.assessment_attempts; a public.assessments; q record; k public.question_keys;
+  v_ans jsonb; v_sel uuid[]; v_text text; v_ok boolean; v_pts numeric; v_total numeric := 0; v_max numeric := 0; v_review boolean := false;
+begin
+  select * into t from public.assessment_attempts where id = p_attempt for update;
+  if t.id is null or t.student_id <> auth.uid() then raise exception 'attempt not found' using errcode='P0002'; end if;
+  if t.status <> 'in_progress' then raise exception 'attempt already submitted' using errcode='P0001'; end if;
+  select * into a from public.assessments where id = t.assessment_id;
+  if a.time_limit_minutes is not null and now() > t.started_at + make_interval(mins => a.time_limit_minutes + 2) then
+    -- late: still graded, but recorded (2 minute network grace)
+    null;
+  end if;
+
+  for q in select * from public.questions where assessment_id = a.id order by position loop
+    v_max := v_max + q.points;
+    select x into v_ans from jsonb_array_elements(coalesce(p_answers,'[]'::jsonb)) x where x ->> 'question_id' = q.id::text limit 1;
+    v_sel := coalesce((select array_agg(value::uuid) from jsonb_array_elements_text(coalesce(v_ans -> 'option_ids','[]'::jsonb))), '{}');
+    -- only accept options that belong to this question
+    v_sel := coalesce((select array_agg(o.id order by o.id) from public.answer_options o where o.question_id = q.id and o.id = any(v_sel)), '{}');
+    v_text := left(v_ans ->> 'text', 4000);
+    select * into k from public.question_keys where question_id = q.id;
+    v_ok := null; v_pts := null;
+    if q.kind in ('single_choice','multiple_choice') then
+      v_ok := k.question_id is not null
+              and coalesce(array_length(v_sel,1),0) > 0
+              and (select coalesce(array_agg(x order by x),'{}') from unnest(k.correct_option_ids) x) = v_sel;
+      v_pts := case when v_ok then q.points else 0 end;
+    else
+      if k.question_id is not null and coalesce(array_length(k.accepted_answers,1),0) > 0 then
+        v_ok := exists (select 1 from unnest(k.accepted_answers) acc
+                        where case when k.case_sensitive then trim(acc) = trim(coalesce(v_text,''))
+                                   else lower(trim(acc)) = lower(trim(coalesce(v_text,''))) end);
+        v_pts := case when v_ok then q.points else 0 end;
+      else
+        v_review := true; -- manual grading workflow
+      end if;
+    end if;
+    insert into public.assessment_answers(attempt_id, question_id, selected_option_ids, text_answer, is_correct, points_awarded)
+    values (t.id, q.id, v_sel, v_text, v_ok, v_pts)
+    on conflict (attempt_id, question_id) do update set selected_option_ids = excluded.selected_option_ids,
+      text_answer = excluded.text_answer, is_correct = excluded.is_correct, points_awarded = excluded.points_awarded;
+    v_total := v_total + coalesce(v_pts, 0);
+  end loop;
+
+  update public.assessment_attempts set
+    submitted_at = now(),
+    status = case when v_review then 'needs_review' else 'graded' end,
+    score_points = v_total, max_points = v_max,
+    score_percent = case when v_max > 0 then round(v_total * 100 / v_max, 2) else 0 end,
+    passed = case when v_review then null else (case when v_max > 0 then v_total * 100 / v_max else 0 end) >= a.pass_percent end
+  where id = t.id returning * into t;
+  return t;
+end $$;
+
+-- Trainer/admin finishes a manual review
+create or replace function public.review_attempt(p_attempt uuid, p_points jsonb, p_feedback text default null) returns public.assessment_attempts
+language plpgsql security definer set search_path = public as $$
+declare t public.assessment_attempts; a public.assessments; v_total numeric;
+begin
+  select * into t from public.assessment_attempts where id = p_attempt for update;
+  if t.id is null then raise exception 'attempt not found' using errcode='P0002'; end if;
+  if not public.is_course_staff(t.course_id) then raise exception 'not allowed' using errcode='42501'; end if;
+  select * into a from public.assessments where id = t.assessment_id;
+  update public.assessment_answers aa set
+    points_awarded = least(greatest((p_points ->> aa.question_id::text)::numeric, 0), q.points),
+    is_correct = (p_points ->> aa.question_id::text)::numeric >= q.points
+  from public.questions q
+  where aa.attempt_id = t.id and q.id = aa.question_id and p_points ? aa.question_id::text;
+  select coalesce(sum(points_awarded),0) into v_total from public.assessment_answers where attempt_id = t.id;
+  update public.assessment_attempts set status = 'graded', score_points = v_total,
+    score_percent = case when max_points > 0 then round(v_total * 100 / max_points, 2) else 0 end,
+    passed = (case when max_points > 0 then v_total * 100 / max_points else 0 end) >= a.pass_percent,
+    reviewed_by = auth.uid(), feedback = left(p_feedback, 4000)
+  where id = t.id returning * into t;
+  perform public.write_audit('review','assessment_attempts', t.id::text, jsonb_build_object('score', t.score_percent));
+  return t;
+end $$;
+
+-- Student-safe view of an assessment (never includes keys)
+create or replace function public.assessment_for_student(p_assessment uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select case when public.is_enrolled(a.course_id) or public.is_course_staff(a.course_id) then
+    jsonb_build_object(
+      'id', a.id, 'course_id', a.course_id, 'title_en', a.title_en, 'title_ar', a.title_ar,
+      'description_en', a.description_en, 'description_ar', a.description_ar,
+      'pass_percent', a.pass_percent, 'max_attempts', a.max_attempts, 'time_limit_minutes', a.time_limit_minutes,
+      'questions', coalesce((select jsonb_agg(jsonb_build_object(
+          'id', q.id, 'kind', q.kind, 'prompt_en', q.prompt_en, 'prompt_ar', q.prompt_ar, 'points', q.points,
+          'options', coalesce((select jsonb_agg(jsonb_build_object('id', o.id, 'label_en', o.label_en, 'label_ar', o.label_ar) order by o.position)
+                               from public.answer_options o where o.question_id = q.id), '[]'::jsonb)
+        ) order by q.position) from public.questions q where q.assessment_id = a.id), '[]'::jsonb))
+  end
+  from public.assessments a where a.id = p_assessment and (a.status = 'published' or public.is_course_staff(a.course_id));
+$$;
+
+-- ---------------------------------------------------------------------
+-- Assignments & submissions
+-- ---------------------------------------------------------------------
+create table public.assignments (
+  id uuid primary key default extensions.gen_random_uuid(),
+  course_id uuid not null references public.courses(id) on delete cascade,
+  title_en text not null, title_ar text not null,
+  instructions_en text, instructions_ar text,
+  due_at timestamptz,
+  max_points int not null default 100 check (max_points between 1 and 1000),
+  status public.publish_status not null default 'published',
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create index assignments_course_idx on public.assignments(course_id);
+create trigger assignments_updated_at before update on public.assignments for each row execute function public.set_updated_at();
+
+create table public.submissions (
+  id uuid primary key default extensions.gen_random_uuid(),
+  assignment_id uuid not null references public.assignments(id) on delete cascade,
+  course_id uuid not null references public.courses(id) on delete cascade,
+  student_id uuid not null references auth.users(id) on delete cascade,
+  body_text text check (body_text is null or char_length(body_text) <= 20000),
+  link_url text check (link_url is null or link_url ~* '^https?://'),
+  file_url text,
+  status text not null default 'submitted' check (status in ('submitted','returned','graded')),
+  submitted_at timestamptz not null default now(),
+  grade_points numeric(8,2),
+  feedback text,
+  graded_by uuid references auth.users(id) on delete set null,
+  graded_at timestamptz,
+  unique (assignment_id, student_id)
+);
+create index submissions_course_idx on public.submissions(course_id, status);
+
+create or replace function public.guard_submission() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_course uuid; v_max int;
+begin
+  select course_id, max_points into v_course, v_max from public.assignments where id = new.assignment_id;
+  new.course_id := v_course;
+  if public.is_service_role() then return new; end if;
+  if public.is_course_staff(v_course) and (tg_op = 'UPDATE') then
+    if new.grade_points is not null and (new.grade_points < 0 or new.grade_points > v_max) then
+      raise exception 'grade out of range' using errcode='22003'; end if;
+    if new.grade_points is distinct from old.grade_points or new.feedback is distinct from old.feedback then
+      new.graded_by := auth.uid(); new.graded_at := now();
+      if new.grade_points is not null then new.status := 'graded'; end if;
+    end if;
+    -- staff cannot rewrite the student's work
+    new.body_text := old.body_text; new.link_url := old.link_url; new.file_url := old.file_url; new.student_id := old.student_id;
+    return new;
+  end if;
+  -- student path
+  if new.student_id <> auth.uid() or not public.is_enrolled(v_course) then
+    raise exception 'not allowed' using errcode='42501'; end if;
+  if tg_op = 'UPDATE' then
+    if old.status = 'graded' then raise exception 'graded submissions cannot be changed' using errcode='42501'; end if;
+    new.student_id := old.student_id;
+  end if;
+  new.grade_points := case when tg_op = 'UPDATE' then old.grade_points else null end;
+  new.feedback := case when tg_op = 'UPDATE' then old.feedback else null end;
+  new.graded_by := case when tg_op = 'UPDATE' then old.graded_by else null end;
+  new.graded_at := case when tg_op = 'UPDATE' then old.graded_at else null end;
+  new.status := 'submitted'; new.submitted_at := now();
+  return new;
+end $$;
+create trigger submissions_guard before insert or update on public.submissions for each row execute function public.guard_submission();
+create trigger submissions_audit after update on public.submissions for each row execute function public.audit_row();
+
+-- ---------------------------------------------------------------------
+-- Attendance
+-- ---------------------------------------------------------------------
+create table public.class_sessions (
+  id uuid primary key default extensions.gen_random_uuid(),
+  course_id uuid not null references public.courses(id) on delete cascade,
+  title text,
+  starts_at timestamptz not null,
+  ends_at timestamptz,
+  location text,
+  created_at timestamptz not null default now()
+);
+create index class_sessions_course_idx on public.class_sessions(course_id, starts_at);
+
+create table public.attendance (
+  session_id uuid not null references public.class_sessions(id) on delete cascade,
+  student_id uuid not null references auth.users(id) on delete cascade,
+  course_id uuid not null references public.courses(id) on delete cascade,
+  status text not null check (status in ('present','absent','late','excused')),
+  marked_by uuid references auth.users(id) on delete set null,
+  marked_at timestamptz not null default now(),
+  primary key (session_id, student_id)
+);
+create index attendance_student_idx on public.attendance(student_id);
+
+create or replace function public.guard_attendance() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  select course_id into new.course_id from public.class_sessions where id = new.session_id;
+  if not (public.is_service_role() or public.is_course_staff(new.course_id)) then
+    raise exception 'only course staff can mark attendance' using errcode='42501'; end if;
+  if not exists (select 1 from public.enrollments where course_id = new.course_id and student_id = new.student_id) then
+    raise exception 'student is not enrolled in this course' using errcode='P0001'; end if;
+  new.marked_by := auth.uid(); new.marked_at := now();
+  return new;
+end $$;
+create trigger attendance_guard before insert or update on public.attendance for each row execute function public.guard_attendance();
+
+-- ---------------------------------------------------------------------
+-- Progress rules (the ONLY way a lesson becomes completed)
+-- ---------------------------------------------------------------------
+create or replace function public.track_lesson_progress(p_lesson uuid, p_video_percent int default null, p_position int default null)
+returns public.lesson_progress
+language plpgsql security definer set search_path = public as $$
+declare l public.lessons; p public.lesson_progress;
+begin
+  select * into l from public.lessons where id = p_lesson and status = 'published';
+  if l.id is null then raise exception 'lesson not found' using errcode='P0002'; end if;
+  if not public.is_enrolled(l.course_id) then raise exception 'you are not enrolled in this course' using errcode='42501'; end if;
+  insert into public.lesson_progress(student_id, lesson_id, course_id, video_percent, last_position_seconds)
+  values (auth.uid(), l.id, l.course_id, least(greatest(coalesce(p_video_percent,0),0),100), greatest(coalesce(p_position,0),0))
+  on conflict (student_id, lesson_id) do update set
+    -- video percent can only go up (the furthest verified point)
+    video_percent = greatest(lesson_progress.video_percent, least(greatest(coalesce(p_video_percent, 0),0),100)),
+    last_position_seconds = coalesce(greatest(p_position,0), lesson_progress.last_position_seconds),
+    updated_at = now()
+  returning * into p;
+  return p;
+end $$;
+
+create or replace function public.complete_lesson(p_lesson uuid) returns public.lesson_progress
+language plpgsql security definer set search_path = public as $$
+declare l public.lessons; p public.lesson_progress; v_ok boolean;
+begin
+  p := public.track_lesson_progress(p_lesson, null, null);
+  select * into l from public.lessons where id = p_lesson;
+  v_ok := case l.completion_rule
+    when 'view' then true
+    when 'video_90' then p.video_percent >= 90
+    when 'quiz_pass' then exists (select 1 from public.assessment_attempts where assessment_id = l.assessment_id and student_id = auth.uid() and passed)
+    when 'assignment_submitted' then exists (select 1 from public.submissions where assignment_id = l.assignment_id and student_id = auth.uid())
+    else false end;
+  if not v_ok then raise exception 'completion requirements not met (%)', l.completion_rule using errcode='P0001'; end if;
+  update public.lesson_progress set status = 'completed', completed_at = coalesce(completed_at, now()), updated_at = now()
+  where student_id = auth.uid() and lesson_id = p_lesson returning * into p;
+  return p;
+end $$;
+
+-- staff manual completion
+create or replace function public.staff_complete_lesson(p_lesson uuid, p_student uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare l public.lessons;
+begin
+  select * into l from public.lessons where id = p_lesson;
+  if not public.is_course_staff(l.course_id) then raise exception 'not allowed' using errcode='42501'; end if;
+  if not public.is_enrolled(l.course_id, p_student) then raise exception 'student not enrolled' using errcode='P0001'; end if;
+  insert into public.lesson_progress(student_id, lesson_id, course_id, status, completed_at)
+  values (p_student, l.id, l.course_id, 'completed', now())
+  on conflict (student_id, lesson_id) do update set status = 'completed', completed_at = coalesce(lesson_progress.completed_at, now());
+  perform public.write_audit('staff_complete','lesson_progress', p_lesson::text, jsonb_build_object('student', p_student));
+end $$;
+
+create or replace function public.course_progress(p_course uuid, p_student uuid default auth.uid())
+returns table (total_lessons int, completed_lessons int, percent int)
+language sql stable security definer set search_path = public as $$
+  with t as (select count(*)::int n from public.lessons where course_id = p_course and status = 'published'),
+       c as (select count(*)::int n from public.lesson_progress lp join public.lessons l on l.id = lp.lesson_id and l.status = 'published'
+             where lp.course_id = p_course and lp.student_id = p_student and lp.status = 'completed')
+  select t.n, c.n, case when t.n = 0 then 0 else (c.n * 100 / t.n) end from t, c
+  where public.can_view_student(p_student) or public.is_course_staff(p_course);
+$$;
+
+-- ---------------------------------------------------------------------
+-- RLS
+-- ---------------------------------------------------------------------
+alter table public.assessments enable row level security;
+alter table public.questions enable row level security;
+alter table public.answer_options enable row level security;
+alter table public.question_keys enable row level security;
+alter table public.assessment_attempts enable row level security;
+alter table public.assessment_answers enable row level security;
+alter table public.assignments enable row level security;
+alter table public.submissions enable row level security;
+alter table public.class_sessions enable row level security;
+alter table public.attendance enable row level security;
+
+create policy assessments_select on public.assessments for select to authenticated using (
+  public.is_course_staff(course_id) or (status = 'published' and public.is_enrolled(course_id)));
+create policy assessments_staff on public.assessments for all to authenticated using (public.is_course_staff(course_id)) with check (public.is_course_staff(course_id));
+
+-- questions/options readable by enrolled students (no keys here)
+create policy questions_select on public.questions for select to authenticated using (
+  exists (select 1 from public.assessments a where a.id = assessment_id and (public.is_course_staff(a.course_id) or public.is_enrolled(a.course_id))));
+create policy questions_staff on public.questions for all to authenticated using (
+  exists (select 1 from public.assessments a where a.id = assessment_id and public.is_course_staff(a.course_id)))
+  with check (exists (select 1 from public.assessments a where a.id = assessment_id and public.is_course_staff(a.course_id)));
+create policy options_select on public.answer_options for select to authenticated using (
+  exists (select 1 from public.questions q join public.assessments a on a.id = q.assessment_id
+          where q.id = question_id and (public.is_course_staff(a.course_id) or public.is_enrolled(a.course_id))));
+create policy options_staff on public.answer_options for all to authenticated using (
+  exists (select 1 from public.questions q join public.assessments a on a.id = q.assessment_id where q.id = question_id and public.is_course_staff(a.course_id)))
+  with check (exists (select 1 from public.questions q join public.assessments a on a.id = q.assessment_id where q.id = question_id and public.is_course_staff(a.course_id)));
+create policy keys_staff_only on public.question_keys for all to authenticated using (
+  exists (select 1 from public.questions q join public.assessments a on a.id = q.assessment_id where q.id = question_id and public.is_course_staff(a.course_id)))
+  with check (exists (select 1 from public.questions q join public.assessments a on a.id = q.assessment_id where q.id = question_id and public.is_course_staff(a.course_id)));
+
+create policy attempts_select on public.assessment_attempts for select to authenticated using (
+  public.can_view_student(student_id) or public.is_course_staff(course_id));
+create policy answers_select on public.assessment_answers for select to authenticated using (
+  exists (select 1 from public.assessment_attempts t where t.id = attempt_id
+          and (public.can_view_student(t.student_id) or public.is_course_staff(t.course_id))));
+
+create policy assignments_select on public.assignments for select to authenticated using (
+  public.is_course_staff(course_id) or (status = 'published' and public.is_enrolled(course_id)));
+create policy assignments_staff on public.assignments for all to authenticated using (public.is_course_staff(course_id)) with check (public.is_course_staff(course_id));
+
+create policy submissions_select on public.submissions for select to authenticated using (
+  public.can_view_student(student_id) or public.is_course_staff(course_id));
+create policy submissions_insert on public.submissions for insert to authenticated with check (student_id = auth.uid());
+create policy submissions_update on public.submissions for update to authenticated using (
+  student_id = auth.uid() or public.is_course_staff(course_id)) with check (true);
+
+create policy sessions_select on public.class_sessions for select to authenticated using (
+  public.is_course_staff(course_id) or public.is_enrolled(course_id)
+  or exists (select 1 from public.enrollments e where e.course_id = class_sessions.course_id and public.can_view_student(e.student_id)));
+create policy sessions_staff on public.class_sessions for all to authenticated using (public.is_course_staff(course_id)) with check (public.is_course_staff(course_id));
+
+create policy attendance_select on public.attendance for select to authenticated using (
+  public.can_view_student(student_id) or public.is_course_staff(course_id));
+create policy attendance_staff on public.attendance for all to authenticated using (public.is_course_staff(course_id)) with check (public.is_course_staff(course_id));
+
+insert into supabase_migrations.schema_migrations(version, name) values ('20261104000300', '20261104000300_assessments.sql') on conflict do nothing;
+
+-- ===== 20261104000400_engagement.sql
+-- =====================================================================
+-- WadiTech Academy — 0004 Certificates, projects, content, labs, notifications
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- Certificates
+-- ---------------------------------------------------------------------
+create table public.certificates (
+  id uuid primary key default extensions.gen_random_uuid(),
+  certificate_number text not null unique,
+  enrollment_id uuid not null unique references public.enrollments(id) on delete restrict,
+  student_id uuid not null references auth.users(id) on delete restrict,
+  course_id uuid not null references public.courses(id) on delete restrict,
+  student_name text not null,
+  course_title_en text not null, course_title_ar text not null,
+  hours_total int,
+  completion_date date not null,
+  signatory_name text not null default 'WadiTech Academy',
+  signatory_title text not null default 'Academic Director',
+  status text not null default 'valid' check (status in ('valid','revoked')),
+  revoked_reason text,
+  issued_by uuid references auth.users(id) on delete set null,
+  issued_at timestamptz not null default now(),
+  is_test_data boolean not null default false
+);
+create index certificates_student_idx on public.certificates(student_id);
+
+create table public.certificate_verifications (
+  id bigint generated always as identity primary key,
+  certificate_id uuid references public.certificates(id) on delete cascade,
+  queried_number text not null,
+  found boolean not null,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.generate_certificate_number() returns text
+language plpgsql as $$
+declare v text; alphabet text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; i int;
+begin
+  loop
+    v := 'WT-' || to_char(now(),'YYYY') || '-';
+    for i in 1..8 loop v := v || substr(alphabet, 1 + (get_byte(extensions.gen_random_bytes(1),0) % 32), 1); end loop;
+    exit when not exists (select 1 from public.certificates where certificate_number = v);
+  end loop;
+  return v;
+end $$;
+
+-- Issuance: only course staff, only for an enrollment whose lessons are all completed (or marked completed)
+create or replace function public.issue_certificate(p_enrollment uuid) returns public.certificates
+language plpgsql security definer set search_path = public as $$
+declare e public.enrollments; c public.courses; pr record; cert public.certificates; v_name text;
+begin
+  select * into e from public.enrollments where id = p_enrollment for update;
+  if e.id is null then raise exception 'enrollment not found' using errcode='P0002'; end if;
+  if not public.is_course_staff(e.course_id) then raise exception 'not allowed to issue certificates' using errcode='42501'; end if;
+  select * into cert from public.certificates where enrollment_id = e.id;
+  if cert.id is not null then return cert; end if;
+  select * into pr from public.course_progress(e.course_id, e.student_id);
+  if e.status <> 'completed' and (pr.total_lessons = 0 or pr.completed_lessons < pr.total_lessons) then
+    raise exception 'student has not completed the course' using errcode='P0001'; end if;
+  select * into c from public.courses where id = e.course_id;
+  select nullif(trim(full_name),'') into v_name from public.profiles where id = e.student_id;
+  if v_name is null then raise exception 'student profile has no name' using errcode='P0001'; end if;
+  if e.status <> 'completed' then update public.enrollments set status = 'completed' where id = e.id; end if;
+  insert into public.certificates(certificate_number, enrollment_id, student_id, course_id, student_name, course_title_en, course_title_ar,
+    hours_total, completion_date, issued_by, is_test_data)
+  values (public.generate_certificate_number(), e.id, e.student_id, e.course_id, v_name, c.title_en, c.title_ar,
+    c.hours_total, current_date, auth.uid(), c.is_test_data)
+  returning * into cert;
+  perform public.write_audit('issue','certificates', cert.id::text, jsonb_build_object('number', cert.certificate_number));
+  insert into public.notifications(user_id, kind, title_en, title_ar, body_en, body_ar, link)
+  values (e.student_id, 'certificate_issued', 'Your certificate is ready', 'شهادتك جاهزة',
+          'Congratulations on completing ' || c.title_en, 'مبارك إتمام ' || c.title_ar, '/dashboard/certificates');
+  return cert;
+end $$;
+
+create or replace function public.revoke_certificate(p_id uuid, p_reason text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'only administrators can revoke certificates' using errcode='42501'; end if;
+  update public.certificates set status = 'revoked', revoked_reason = left(p_reason, 500) where id = p_id;
+  perform public.write_audit('revoke','certificates', p_id::text, jsonb_build_object('reason', p_reason));
+end $$;
+
+-- Public verification with minimal personal data
+create or replace function public.verify_certificate(p_number text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare c public.certificates; v_num text := upper(trim(coalesce(p_number,'')));
+begin
+  if v_num !~ '^WT-[0-9]{4}-[A-Z0-9]{8}$' then return jsonb_build_object('found', false); end if;
+  select * into c from public.certificates where certificate_number = v_num;
+  insert into public.certificate_verifications(certificate_id, queried_number, found) values (c.id, v_num, c.id is not null);
+  if c.id is null then return jsonb_build_object('found', false); end if;
+  return jsonb_build_object('found', true, 'certificate_number', c.certificate_number, 'student_name', c.student_name,
+    'course_title_en', c.course_title_en, 'course_title_ar', c.course_title_ar, 'completion_date', c.completion_date,
+    'status', c.status, 'is_test_data', c.is_test_data);
+end $$;
+grant execute on function public.verify_certificate(text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- Student projects / portfolio
+-- ---------------------------------------------------------------------
+create table public.student_projects (
+  id uuid primary key default extensions.gen_random_uuid(),
+  student_id uuid not null references auth.users(id) on delete cascade,
+  course_id uuid references public.courses(id) on delete set null,
+  title text not null check (char_length(title) between 3 and 160),
+  description text check (description is null or char_length(description) <= 5000),
+  cover_url text,
+  link_url text check (link_url is null or link_url ~* '^https?://'),
+  visibility text not null default 'private' check (visibility in ('private','academy','public')),
+  approval_status text not null default 'not_requested' check (approval_status in ('not_requested','pending','approved','rejected')),
+  reviewed_by uuid references auth.users(id) on delete set null,
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create index projects_student_idx on public.student_projects(student_id);
+create trigger projects_updated_at before update on public.student_projects for each row execute function public.set_updated_at();
+
+create or replace function public.guard_project() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_service_role() or public.is_admin() then
+    if tg_op = 'UPDATE' and new.approval_status is distinct from old.approval_status then new.reviewed_by := auth.uid(); end if;
+    return new;
+  end if;
+  if new.student_id <> auth.uid() then raise exception 'not allowed' using errcode='42501'; end if;
+  -- students can request public showcase but never approve themselves
+  if new.visibility = 'public' then
+    if tg_op = 'INSERT' or old.approval_status <> 'approved' or new.title is distinct from old.title
+       or new.description is distinct from old.description or new.cover_url is distinct from old.cover_url then
+      new.approval_status := 'pending';
+    end if;
+  else
+    new.approval_status := 'not_requested';
+  end if;
+  if tg_op = 'UPDATE' then new.reviewed_by := old.reviewed_by; new.is_test_data := old.is_test_data; else new.is_test_data := false; end if;
+  return new;
+end $$;
+create trigger projects_guard before insert or update on public.student_projects for each row execute function public.guard_project();
+
+-- ---------------------------------------------------------------------
+-- News / Events / Competitions / Scholarships
+-- ---------------------------------------------------------------------
+create table public.news_articles (
+  id uuid primary key default extensions.gen_random_uuid(),
+  slug text not null unique check (slug ~ '^[a-z0-9-]{2,120}$'),
+  title_en text not null, title_ar text not null,
+  excerpt_en text, excerpt_ar text,
+  body_en text, body_ar text,
+  cover_url text,
+  category text not null default 'news' check (category in ('news','announcement','article','achievement')),
+  status public.publish_status not null default 'draft',
+  published_at timestamptz,
+  featured boolean not null default false,
+  is_breaking boolean not null default false,
+  seo_title text, seo_description text,
+  author_id uuid references auth.users(id) on delete set null,
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create index news_public_idx on public.news_articles(status, published_at desc);
+create trigger news_updated_at before update on public.news_articles for each row execute function public.set_updated_at();
+create trigger news_audit after insert or update or delete on public.news_articles for each row execute function public.audit_row();
+
+create table public.events (
+  id uuid primary key default extensions.gen_random_uuid(),
+  slug text not null unique check (slug ~ '^[a-z0-9-]{2,120}$'),
+  title_en text not null, title_ar text not null,
+  description_en text, description_ar text,
+  starts_at timestamptz not null, ends_at timestamptz,
+  location_en text, location_ar text,
+  capacity int check (capacity is null or capacity > 0),
+  registration_open boolean not null default true,
+  status text not null default 'draft' check (status in ('draft','published','cancelled','completed','archived')),
+  cover_url text,
+  course_id uuid references public.courses(id) on delete set null,
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  check (ends_at is null or ends_at >= starts_at)
+);
+create index events_public_idx on public.events(status, starts_at);
+create trigger events_updated_at before update on public.events for each row execute function public.set_updated_at();
+create trigger events_audit after insert or update or delete on public.events for each row execute function public.audit_row();
+
+create table public.event_registrations (
+  id uuid primary key default extensions.gen_random_uuid(),
+  event_id uuid not null references public.events(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  attendee_name text not null,
+  status text not null default 'registered' check (status in ('registered','waitlisted','cancelled','attended')),
+  created_at timestamptz not null default now(),
+  unique (event_id, user_id)
+);
+
+create or replace function public.register_for_event(p_event uuid, p_attendee_name text default null) returns public.event_registrations
+language plpgsql security definer set search_path = public as $$
+declare ev public.events; n int; r public.event_registrations; v_name text;
+begin
+  if auth.uid() is null then raise exception 'authentication required' using errcode='42501'; end if;
+  select * into ev from public.events where id = p_event for update;
+  if ev.id is null or ev.status <> 'published' then raise exception 'event not available' using errcode='P0002'; end if;
+  if not ev.registration_open or ev.starts_at < now() then raise exception 'registration is closed' using errcode='P0001'; end if;
+  select * into r from public.event_registrations where event_id = ev.id and user_id = auth.uid();
+  if r.id is not null and r.status <> 'cancelled' then return r; end if;
+  select count(*) into n from public.event_registrations where event_id = ev.id and status = 'registered';
+  v_name := coalesce(nullif(trim(p_attendee_name),''), (select full_name from public.profiles where id = auth.uid()), 'Attendee');
+  insert into public.event_registrations(event_id, user_id, attendee_name, status)
+  values (ev.id, auth.uid(), left(v_name,120), case when ev.capacity is not null and n >= ev.capacity then 'waitlisted' else 'registered' end)
+  on conflict (event_id, user_id) do update set status = excluded.status, attendee_name = excluded.attendee_name
+  returning * into r;
+  insert into public.notifications(user_id, kind, title_en, title_ar, body_en, body_ar, link)
+  values (auth.uid(), 'event_registration',
+    case when r.status = 'registered' then 'Event registration confirmed' else 'You are on the waitlist' end,
+    case when r.status = 'registered' then 'تم تأكيد تسجيلك في الفعالية' else 'أنت على قائمة الانتظار' end,
+    ev.title_en, ev.title_ar, '/events/' || ev.slug);
+  return r;
+end $$;
+
+create or replace function public.event_seats(p_event uuid) returns table (registered int, capacity int)
+language sql stable security definer set search_path = public as $$
+  select (select count(*)::int from public.event_registrations where event_id = e.id and status = 'registered'), e.capacity
+  from public.events e where e.id = p_event and e.status in ('published','completed');
+$$;
+grant execute on function public.event_seats(uuid) to anon, authenticated;
+
+create table public.competitions (
+  id uuid primary key default extensions.gen_random_uuid(),
+  slug text not null unique check (slug ~ '^[a-z0-9-]{2,120}$'),
+  title_en text not null, title_ar text not null,
+  description_en text, description_ar text,
+  category public.course_category,
+  eligibility_en text, eligibility_ar text,
+  team_min int not null default 1 check (team_min >= 1),
+  team_max int not null default 4 check (team_max >= 1),
+  age_min int, age_max int,
+  registration_deadline timestamptz,
+  event_date date,
+  status text not null default 'draft' check (status in ('draft','open','closed','completed','archived')),
+  cover_url text,
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  check (team_max >= team_min)
+);
+create trigger competitions_updated_at before update on public.competitions for each row execute function public.set_updated_at();
+
+create table public.competition_teams (
+  id uuid primary key default extensions.gen_random_uuid(),
+  competition_id uuid not null references public.competitions(id) on delete cascade,
+  captain_id uuid not null references auth.users(id) on delete cascade,
+  name text not null check (char_length(name) between 2 and 80),
+  members jsonb not null default '[]'::jsonb, -- [{name, age}] minimal data
+  project_summary text check (project_summary is null or char_length(project_summary) <= 3000),
+  status text not null default 'submitted' check (status in ('submitted','accepted','rejected','withdrawn')),
+  created_at timestamptz not null default now(),
+  unique (competition_id, name)
+);
+
+create or replace function public.guard_team() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare c public.competitions; n int;
+begin
+  if public.is_service_role() or public.is_admin() then return new; end if;
+  select * into c from public.competitions where id = new.competition_id;
+  if new.captain_id <> auth.uid() then raise exception 'not allowed' using errcode='42501'; end if;
+  if tg_op = 'INSERT' then
+    if c.status <> 'open' or (c.registration_deadline is not null and c.registration_deadline < now()) then
+      raise exception 'registration is closed' using errcode='P0001'; end if;
+    new.status := 'submitted';
+  else
+    if new.status not in ('withdrawn', old.status) then raise exception 'status can only be changed by administrators' using errcode='42501'; end if;
+  end if;
+  n := jsonb_array_length(new.members);
+  if n < c.team_min or n > c.team_max then raise exception 'team size must be between % and %', c.team_min, c.team_max using errcode='P0001'; end if;
+  return new;
+end $$;
+create trigger teams_guard before insert or update on public.competition_teams for each row execute function public.guard_team();
+
+create table public.scholarships (
+  id uuid primary key default extensions.gen_random_uuid(),
+  slug text not null unique check (slug ~ '^[a-z0-9-]{2,120}$'),
+  title_en text not null, title_ar text not null,
+  description_en text, description_ar text,
+  criteria_en text, criteria_ar text,
+  coverage_percent int check (coverage_percent between 1 and 100),
+  course_id uuid references public.courses(id) on delete set null,
+  deadline timestamptz,
+  status text not null default 'draft' check (status in ('draft','open','closed','archived')),
+  is_test_data boolean not null default false,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create trigger scholarships_updated_at before update on public.scholarships for each row execute function public.set_updated_at();
+
+create table public.scholarship_applications (
+  id uuid primary key default extensions.gen_random_uuid(),
+  scholarship_id uuid not null references public.scholarships(id) on delete cascade,
+  applicant_id uuid not null references auth.users(id) on delete cascade,
+  student_name text not null,
+  statement text not null check (char_length(statement) between 50 and 5000),
+  status text not null default 'submitted' check (status in ('submitted','under_review','approved','rejected','withdrawn')),
+  decision_note text,
+  reviewed_by uuid references auth.users(id) on delete set null,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (scholarship_id, applicant_id)
+);
+
+create or replace function public.guard_scholarship_app() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare s public.scholarships;
+begin
+  if public.is_service_role() or public.is_admin() then
+    if tg_op = 'UPDATE' and new.status is distinct from old.status then new.reviewed_by := auth.uid(); new.reviewed_at := now(); end if;
+    return new;
+  end if;
+  if new.applicant_id <> auth.uid() then raise exception 'not allowed' using errcode='42501'; end if;
+  if tg_op = 'INSERT' then
+    select * into s from public.scholarships where id = new.scholarship_id;
+    if s.status <> 'open' or (s.deadline is not null and s.deadline < now()) then raise exception 'applications are closed' using errcode='P0001'; end if;
+    new.status := 'submitted'; new.decision_note := null; new.reviewed_by := null; new.reviewed_at := null;
+  else
+    if new.status not in ('withdrawn', old.status) or new.decision_note is distinct from old.decision_note then
+      raise exception 'only administrators can review applications' using errcode='42501'; end if;
+  end if;
+  return new;
+end $$;
+create trigger scholarship_app_guard before insert or update on public.scholarship_applications for each row execute function public.guard_scholarship_app();
+create trigger scholarship_app_audit after update on public.scholarship_applications for each row execute function public.audit_row();
+
+-- ---------------------------------------------------------------------
+-- Media library
+-- ---------------------------------------------------------------------
+create table public.media_assets (
+  id uuid primary key default extensions.gen_random_uuid(),
+  kind text not null check (kind in ('image','video','document')),
+  url text not null,
+  poster_url text,
+  title_en text, title_ar text,
+  alt_en text, alt_ar text,
+  category text not null default 'general' check (category in ('general','competition','classroom','projects','events','labs','brand')),
+  width int, height int, bytes bigint,
+  mime_type text,
+  -- children's privacy: media showing students is public only after consent is recorded
+  shows_students boolean not null default true,
+  consent_status text not null default 'pending' check (consent_status in ('not_required','pending','granted','denied')),
+  is_public boolean not null default false,
+  featured boolean not null default false,
+  uploaded_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index media_public_idx on public.media_assets(is_public, category, created_at desc);
+
+-- ---------------------------------------------------------------------
+-- Virtual labs
+-- ---------------------------------------------------------------------
+create table public.labs (
+  id uuid primary key default extensions.gen_random_uuid(),
+  slug text not null unique check (slug ~ '^[a-z0-9-]{2,80}$'),
+  category text not null check (category in ('robotics','electronics','programming','ai','cybersecurity','3d_design')),
+  title_en text not null, title_ar text not null,
+  summary_en text, summary_ar text,
+  instructions_en text, instructions_ar text,
+  provider text not null check (provider in ('wokwi','tinkercad','python_online','teachable_machine','internal','external_link')),
+  launch_url text check (launch_url is null or launch_url ~* '^https://'),
+  embed_allowed boolean not null default false,
+  level public.course_level not null default 'beginner',
+  status public.publish_status not null default 'draft',
+  position int not null default 0,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create trigger labs_updated_at before update on public.labs for each row execute function public.set_updated_at();
+
+create table public.lab_submissions (
+  id uuid primary key default extensions.gen_random_uuid(),
+  lab_id uuid not null references public.labs(id) on delete cascade,
+  student_id uuid not null references auth.users(id) on delete cascade,
+  project_url text not null check (project_url ~* '^https://'),
+  notes text check (notes is null or char_length(notes) <= 3000),
+  status text not null default 'submitted' check (status in ('submitted','reviewed')),
+  feedback text,
+  reviewed_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index lab_submissions_student_idx on public.lab_submissions(student_id);
+
+create or replace function public.guard_lab_submission() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_service_role() or public.is_admin() or public.has_role('trainer') then
+    if tg_op = 'UPDATE' then
+      if public.has_role('trainer') and not public.is_admin() and not public.teaches_student(new.student_id) then
+        raise exception 'not allowed' using errcode='42501'; end if;
+      new.reviewed_by := auth.uid(); new.status := 'reviewed';
+      new.project_url := old.project_url; new.notes := old.notes; new.student_id := old.student_id;
+    end if;
+    return new;
+  end if;
+  if new.student_id <> auth.uid() then raise exception 'not allowed' using errcode='42501'; end if;
+  if tg_op = 'UPDATE' and new.feedback is distinct from old.feedback then raise exception 'not allowed' using errcode='42501'; end if;
+  if tg_op = 'INSERT' then new.feedback := null; new.status := 'submitted'; new.reviewed_by := null; end if;
+  return new;
+end $$;
+create trigger lab_submissions_guard before insert or update on public.lab_submissions for each row execute function public.guard_lab_submission();
+
+-- ---------------------------------------------------------------------
+-- Notifications (in-app now; email adapter later)
+-- ---------------------------------------------------------------------
+create table public.notifications (
+  id uuid primary key default extensions.gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  kind text not null,
+  title_en text not null, title_ar text not null,
+  body_en text, body_ar text,
+  link text,
+  read_at timestamptz,
+  email_status text not null default 'not_requested' check (email_status in ('not_requested','queued','sent','failed')),
+  email_attempts int not null default 0,
+  email_last_error text,
+  created_at timestamptz not null default now()
+);
+create index notifications_user_idx on public.notifications(user_id, created_at desc);
+
+create or replace function public.guard_notification_update() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_service_role() or public.is_admin() then return new; end if;
+  -- owners may only toggle read_at
+  if (to_jsonb(new) - 'read_at') is distinct from (to_jsonb(old) - 'read_at') then
+    raise exception 'not allowed' using errcode='42501'; end if;
+  return new;
+end $$;
+create trigger notifications_guard before update on public.notifications for each row execute function public.guard_notification_update();
+
+-- Admin broadcast announcement to a role
+create or replace function public.broadcast_announcement(p_role public.app_role, p_title_en text, p_title_ar text, p_body_en text, p_body_ar text, p_link text default null)
+returns int language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if not public.is_admin() then raise exception 'not allowed' using errcode='42501'; end if;
+  insert into public.notifications(user_id, kind, title_en, title_ar, body_en, body_ar, link)
+  select r.user_id, 'announcement', p_title_en, p_title_ar, p_body_en, p_body_ar, p_link from public.user_roles r where r.role = p_role;
+  get diagnostics n = row_count;
+  perform public.write_audit('broadcast','notifications', p_role::text, jsonb_build_object('count', n));
+  return n;
+end $$;
+
+-- enrollment state change -> notification
+create or replace function public.notify_enrollment() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare c public.courses;
+begin
+  if new.status = 'active' and (tg_op = 'INSERT' or old.status is distinct from 'active') then
+    select * into c from public.courses where id = new.course_id;
+    insert into public.notifications(user_id, kind, title_en, title_ar, body_en, body_ar, link)
+    values (new.student_id, 'enrollment_confirmed', 'Enrollment confirmed', 'تم تأكيد التسجيل',
+            'You can now start ' || c.title_en, 'يمكنك الآن البدء في ' || c.title_ar, '/learn/' || c.slug);
+  end if;
+  return new;
+end $$;
+create trigger enrollments_notify after insert or update on public.enrollments for each row execute function public.notify_enrollment();
+
+-- graded submission/attempt -> notification
+create or replace function public.notify_grade() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.status = 'graded' and old.status is distinct from 'graded' then
+    insert into public.notifications(user_id, kind, title_en, title_ar, body_en, body_ar, link)
+    values (new.student_id, 'assessment_result', 'New feedback available', 'تقييم جديد متاح',
+            'Your work has been reviewed.', 'تمت مراجعة عملك.', '/dashboard');
+  end if;
+  return new;
+end $$;
+create trigger submissions_notify after update on public.submissions for each row execute function public.notify_grade();
+create trigger attempts_notify after update on public.assessment_attempts for each row execute function public.notify_grade();
+
+-- ---------------------------------------------------------------------
+-- Contact inquiries & server-side rate limiting
+-- ---------------------------------------------------------------------
+create table public.contact_messages (
+  id uuid primary key default extensions.gen_random_uuid(),
+  name text not null check (char_length(name) between 2 and 120),
+  email text not null check (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  phone text check (phone is null or char_length(phone) <= 32),
+  topic text not null default 'general' check (topic in ('general','enrollment','schools','partnership','media','support')),
+  message text not null check (char_length(message) between 10 and 5000),
+  locale text not null default 'en',
+  status text not null default 'new' check (status in ('new','in_progress','closed')),
+  created_at timestamptz not null default now()
+);
+
+create table public.rate_limits (
+  bucket text not null,
+  window_start timestamptz not null,
+  hits int not null default 0,
+  primary key (bucket, window_start)
+);
+
+-- returns true if allowed; service-role only (called from the server)
+create or replace function public.rate_limit_hit(p_bucket text, p_limit int, p_window_seconds int) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare v_window timestamptz := to_timestamp(floor(extract(epoch from now()) / p_window_seconds) * p_window_seconds); v_hits int;
+begin
+  insert into public.rate_limits(bucket, window_start, hits) values (p_bucket, v_window, 1)
+  on conflict (bucket, window_start) do update set hits = rate_limits.hits + 1
+  returning hits into v_hits;
+  delete from public.rate_limits where window_start < now() - interval '1 day';
+  return v_hits <= p_limit;
+end $$;
+revoke execute on function public.rate_limit_hit(text,int,int) from public, anon, authenticated;
+grant execute on function public.rate_limit_hit(text,int,int) to service_role;
+
+-- AI usage (cost tracking + quotas)
+create table public.ai_usage (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null,
+  model text,
+  course_id uuid references public.courses(id) on delete set null,
+  input_tokens int not null default 0,
+  output_tokens int not null default 0,
+  cost_usd numeric(10,5) not null default 0,
+  blocked_reason text,
+  created_at timestamptz not null default now()
+);
+create index ai_usage_user_idx on public.ai_usage(user_id, created_at desc);
+
+-- ---------------------------------------------------------------------
+-- RLS
+-- ---------------------------------------------------------------------
+alter table public.certificates enable row level security;
+alter table public.certificate_verifications enable row level security;
+alter table public.student_projects enable row level security;
+alter table public.news_articles enable row level security;
+alter table public.events enable row level security;
+alter table public.event_registrations enable row level security;
+alter table public.competitions enable row level security;
+alter table public.competition_teams enable row level security;
+alter table public.scholarships enable row level security;
+alter table public.scholarship_applications enable row level security;
+alter table public.media_assets enable row level security;
+alter table public.labs enable row level security;
+alter table public.lab_submissions enable row level security;
+alter table public.notifications enable row level security;
+alter table public.contact_messages enable row level security;
+alter table public.rate_limits enable row level security;
+alter table public.ai_usage enable row level security;
+
+create policy certs_select on public.certificates for select to authenticated using (public.can_view_student(student_id) or public.is_course_staff(course_id));
+create policy cert_verifications_admin on public.certificate_verifications for select to authenticated using (public.is_admin());
+
+create policy projects_select on public.student_projects for select to anon, authenticated using (
+  (visibility = 'public' and approval_status = 'approved')
+  or (auth.uid() is not null and (public.can_view_student(student_id) or (visibility = 'academy' and public.is_active_user()))));
+create policy projects_insert on public.student_projects for insert to authenticated with check (student_id = auth.uid() or public.is_admin());
+create policy projects_update on public.student_projects for update to authenticated using (student_id = auth.uid() or public.is_admin()) with check (true);
+create policy projects_delete on public.student_projects for delete to authenticated using (student_id = auth.uid() or public.is_admin());
+
+create policy news_public on public.news_articles for select to anon, authenticated using ((status = 'published' and published_at <= now()) or public.is_admin());
+create policy news_admin on public.news_articles for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+create policy events_public on public.events for select to anon, authenticated using (status in ('published','completed','cancelled') or public.is_admin());
+create policy events_admin on public.events for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy event_regs_select on public.event_registrations for select to authenticated using (user_id = auth.uid() or public.is_admin());
+create policy event_regs_cancel on public.event_registrations for update to authenticated using (user_id = auth.uid() or public.is_admin())
+  with check ((user_id = auth.uid() and status = 'cancelled') or public.is_admin());
+
+create policy competitions_public on public.competitions for select to anon, authenticated using (status <> 'draft' or public.is_admin());
+create policy competitions_admin on public.competitions for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy teams_select on public.competition_teams for select to authenticated using (captain_id = auth.uid() or public.is_admin());
+create policy teams_insert on public.competition_teams for insert to authenticated with check (captain_id = auth.uid());
+create policy teams_update on public.competition_teams for update to authenticated using (captain_id = auth.uid() or public.is_admin()) with check (true);
+
+create policy scholarships_public on public.scholarships for select to anon, authenticated using (status <> 'draft' or public.is_admin());
+create policy scholarships_admin on public.scholarships for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy sapps_select on public.scholarship_applications for select to authenticated using (applicant_id = auth.uid() or public.is_admin());
+create policy sapps_insert on public.scholarship_applications for insert to authenticated with check (applicant_id = auth.uid());
+create policy sapps_update on public.scholarship_applications for update to authenticated using (applicant_id = auth.uid() or public.is_admin()) with check (true);
+
+create policy media_public on public.media_assets for select to anon, authenticated using (
+  (is_public and (not shows_students or consent_status = 'granted')) or public.is_admin());
+create policy media_admin on public.media_assets for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+create policy labs_public on public.labs for select to anon, authenticated using (status = 'published' or public.is_admin());
+create policy labs_admin on public.labs for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy lab_subs_select on public.lab_submissions for select to authenticated using (public.can_view_student(student_id));
+create policy lab_subs_insert on public.lab_submissions for insert to authenticated with check (student_id = auth.uid());
+create policy lab_subs_update on public.lab_submissions for update to authenticated using (public.can_view_student(student_id)) with check (true);
+
+create policy notifications_own on public.notifications for select to authenticated using (user_id = auth.uid());
+create policy notifications_mark_read on public.notifications for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy contact_admin on public.contact_messages for select to authenticated using (public.is_admin());
+create policy contact_admin_update on public.contact_messages for update to authenticated using (public.is_admin()) with check (public.is_admin());
+-- inserts happen server-side (service role) after validation + rate limiting
+
+create policy ai_usage_select on public.ai_usage for select to authenticated using (user_id = auth.uid() or public.is_admin());
+-- rate_limits: no policies (service role only)
+
+insert into supabase_migrations.schema_migrations(version, name) values ('20261104000400', '20261104000400_engagement.sql') on conflict do nothing;
+
+-- ===== 20261104000500_payments.sql
+-- =====================================================================
+-- WadiTech Academy — 0005 Orders & payments (SANDBOX FIRST)
+-- Card data never touches this database. Client-side confirmation is never trusted:
+-- only the server (service role) can mark an order paid, after verifying with the provider.
+-- =====================================================================
+create table public.discount_codes (
+  code text primary key check (code ~ '^[A-Z0-9-]{3,32}$'),
+  percent_off int not null check (percent_off between 1 and 100),
+  max_uses int check (max_uses is null or max_uses > 0),
+  used_count int not null default 0,
+  valid_until timestamptz,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table public.orders (
+  id uuid primary key default extensions.gen_random_uuid(),
+  order_number text not null unique default ('ORD-' || upper(substr(replace(extensions.gen_random_uuid()::text,'-',''),1,10))),
+  user_id uuid not null references auth.users(id) on delete restrict,
+  student_id uuid not null references auth.users(id) on delete restrict,
+  course_id uuid not null references public.courses(id) on delete restrict,
+  enrollment_id uuid not null references public.enrollments(id) on delete restrict,
+  subtotal numeric(10,3) not null check (subtotal >= 0),
+  discount_amount numeric(10,3) not null default 0 check (discount_amount >= 0),
+  total numeric(10,3) not null check (total >= 0),
+  currency public.currency_code not null,
+  discount_code text references public.discount_codes(code),
+  status text not null default 'pending' check (status in ('pending','paid','failed','cancelled','refunded','partially_refunded')),
+  provider text not null default 'sandbox' check (provider in ('sandbox','hyperpay')),
+  provider_checkout_id text,
+  is_sandbox boolean not null default true,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create index orders_user_idx on public.orders(user_id, created_at desc);
+create index orders_checkout_idx on public.orders(provider_checkout_id);
+create trigger orders_updated_at before update on public.orders for each row execute function public.set_updated_at();
+create trigger orders_audit after insert or update on public.orders for each row execute function public.audit_row();
+
+create table public.payment_transactions (
+  id uuid primary key default extensions.gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete restrict,
+  provider text not null,
+  type text not null check (type in ('payment','refund')),
+  provider_reference text,
+  amount numeric(10,3) not null,
+  currency public.currency_code not null,
+  status text not null check (status in ('succeeded','failed','pending')),
+  result_code text,
+  result_description text,
+  is_sandbox boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (provider, provider_reference, type)
+);
+create index payment_tx_order_idx on public.payment_transactions(order_id);
+
+-- Create (or reuse) the order for a pending_payment enrollment. Price is ALWAYS read from the course row.
+create or replace function public.create_order_for_enrollment(p_enrollment uuid, p_discount_code text default null) returns public.orders
+language plpgsql security definer set search_path = public as $$
+declare e public.enrollments; c public.courses; d public.discount_codes; o public.orders; v_disc numeric := 0;
+begin
+  select * into e from public.enrollments where id = p_enrollment for update;
+  if e.id is null then raise exception 'enrollment not found' using errcode='P0002'; end if;
+  if not (e.student_id = auth.uid() or public.is_parent_of(e.student_id) or public.is_admin()) then
+    raise exception 'not allowed' using errcode='42501'; end if;
+  if e.status <> 'pending_payment' then raise exception 'enrollment does not require payment' using errcode='P0001'; end if;
+  select * into o from public.orders where enrollment_id = e.id and status = 'pending' order by created_at desc limit 1;
+  if o.id is not null and p_discount_code is null then return o; end if;
+  select * into c from public.courses where id = e.course_id;
+  if p_discount_code is not null and length(trim(p_discount_code)) > 0 then
+    select * into d from public.discount_codes where code = upper(trim(p_discount_code)) and active
+      and (valid_until is null or valid_until > now()) and (max_uses is null or used_count < max_uses);
+    if d.code is null then raise exception 'invalid discount code' using errcode='P0001'; end if;
+    v_disc := round(c.price_amount * d.percent_off / 100.0, 3);
+  end if;
+  if o.id is not null then update public.orders set status = 'cancelled' where id = o.id; end if;
+  insert into public.orders(user_id, student_id, course_id, enrollment_id, subtotal, discount_amount, total, currency, discount_code)
+  values (auth.uid(), e.student_id, c.id, e.id, c.price_amount, v_disc, greatest(c.price_amount - v_disc, 0), c.currency, d.code)
+  returning * into o;
+  return o;
+end $$;
+
+-- SERVER ONLY: record a verified provider result. Amount & currency must match the order exactly.
+create or replace function public.record_payment_result(p_order uuid, p_provider text, p_reference text, p_amount numeric, p_currency public.currency_code,
+  p_succeeded boolean, p_result_code text, p_result_description text, p_is_sandbox boolean) returns public.orders
+language plpgsql security definer set search_path = public as $$
+declare o public.orders;
+begin
+  if not public.is_service_role() then raise exception 'server only' using errcode='42501'; end if;
+  select * into o from public.orders where id = p_order for update;
+  if o.id is null then raise exception 'order not found' using errcode='P0002'; end if;
+  insert into public.payment_transactions(order_id, provider, type, provider_reference, amount, currency, status, result_code, result_description, is_sandbox)
+  values (o.id, p_provider, 'payment', p_reference, p_amount, p_currency, case when p_succeeded then 'succeeded' else 'failed' end,
+          left(p_result_code,64), left(p_result_description,300), p_is_sandbox)
+  on conflict (provider, provider_reference, type) do nothing;
+  if o.status = 'paid' then return o; end if; -- idempotent
+  if p_succeeded then
+    if p_amount <> o.total or p_currency <> o.currency then
+      update public.orders set status = 'failed' where id = o.id returning * into o;
+      perform public.write_audit('amount_mismatch','orders', o.id::text, jsonb_build_object('expected', o.total, 'got', p_amount));
+      return o;
+    end if;
+    update public.orders set status = 'paid', paid_at = now(), provider = p_provider, is_sandbox = p_is_sandbox where id = o.id returning * into o;
+    update public.enrollments set status = case when (select requires_approval from public.courses where id = o.course_id) then 'pending_approval'::public.enrollment_status else 'active'::public.enrollment_status end
+      where id = o.enrollment_id and status = 'pending_payment';
+    if o.discount_code is not null then update public.discount_codes set used_count = used_count + 1 where code = o.discount_code; end if;
+  else
+    update public.orders set status = 'failed' where id = o.id and status = 'pending' returning * into o;
+  end if;
+  return o;
+end $$;
+revoke execute on function public.record_payment_result(uuid,text,text,numeric,public.currency_code,boolean,text,text,boolean) from public, anon, authenticated;
+grant execute on function public.record_payment_result(uuid,text,text,numeric,public.currency_code,boolean,text,text,boolean) to service_role;
+
+-- Admin refund status (provider refund call happens in the server adapter first)
+create or replace function public.mark_order_refunded(p_order uuid, p_amount numeric, p_reference text) returns public.orders
+language plpgsql security definer set search_path = public as $$
+declare o public.orders;
+begin
+  if not (public.is_service_role() or public.is_admin()) then raise exception 'not allowed' using errcode='42501'; end if;
+  select * into o from public.orders where id = p_order for update;
+  if o.status not in ('paid','partially_refunded') then raise exception 'order is not paid' using errcode='P0001'; end if;
+  if p_amount <= 0 or p_amount > o.total then raise exception 'invalid refund amount' using errcode='P0001'; end if;
+  insert into public.payment_transactions(order_id, provider, type, provider_reference, amount, currency, status, is_sandbox)
+  values (o.id, o.provider, 'refund', coalesce(p_reference, 'manual-' || extensions.gen_random_uuid()), p_amount, o.currency, 'succeeded', o.is_sandbox);
+  update public.orders set status = case when p_amount = o.total then 'refunded' else 'partially_refunded' end where id = o.id returning * into o;
+  if o.status = 'refunded' then update public.enrollments set status = 'refunded' where id = o.enrollment_id; end if;
+  return o;
+end $$;
+
+alter table public.discount_codes enable row level security;
+alter table public.orders enable row level security;
+alter table public.payment_transactions enable row level security;
+
+create policy discount_admin on public.discount_codes for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy orders_select on public.orders for select to authenticated using (user_id = auth.uid() or public.is_parent_of(student_id) or student_id = auth.uid() or public.is_admin());
+create policy payment_tx_select on public.payment_transactions for select to authenticated using (
+  public.is_admin() or exists (select 1 from public.orders o where o.id = order_id and (o.user_id = auth.uid() or o.student_id = auth.uid())));
+-- no insert/update policies: orders change only via the functions above
+
+insert into supabase_migrations.schema_migrations(version, name) values ('20261104000500', '20261104000500_payments.sql') on conflict do nothing;
+
+-- ===== 20261104000600_public_helpers.sql
+-- =====================================================================
+-- WadiTech Academy — 0006 Narrow, privacy-preserving read helpers
+-- Profiles are NEVER public. These functions expose only the minimum fields a page needs.
+-- =====================================================================
+
+create or replace function public.course_seats(p_course uuid) returns int
+language sql stable security definer set search_path = public as $$
+  select count(*)::int from public.enrollments
+  where course_id = p_course and status in ('active','completed','pending_payment','pending_approval')
+    and exists (select 1 from public.courses c where c.id = p_course and c.status = 'published');
+$$;
+grant execute on function public.course_seats(uuid) to anon, authenticated;
+
+-- trainer display names for a published course (staff names are public-facing)
+create or replace function public.course_trainers(p_course uuid) returns table (trainer_id uuid, full_name text, is_lead boolean)
+language sql stable security definer set search_path = public as $$
+  select ci.trainer_id, p.full_name, ci.is_lead from public.course_instructors ci
+  join public.profiles p on p.id = ci.trainer_id
+  join public.courses c on c.id = ci.course_id and c.status = 'published'
+  where ci.course_id = p_course order by ci.is_lead desc, p.full_name;
+$$;
+grant execute on function public.course_trainers(uuid) to anon, authenticated;
+
+-- approved public projects with FIRST NAME ONLY of the student
+create or replace function public.public_projects(p_limit int default 24) returns table (
+  id uuid, title text, description text, cover_url text, link_url text, student_first_name text, course_title_en text, course_title_ar text, is_test_data boolean, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select sp.id, sp.title, sp.description, sp.cover_url, sp.link_url,
+         split_part(regexp_replace(coalesce(p.full_name,''), '^Demo (Student )?', ''), ' ', 1),
+         c.title_en, c.title_ar, sp.is_test_data, sp.created_at
+  from public.student_projects sp
+  join public.profiles p on p.id = sp.student_id
+  left join public.courses c on c.id = sp.course_id
+  where sp.visibility = 'public' and sp.approval_status = 'approved'
+  order by sp.created_at desc limit least(greatest(p_limit,1),100);
+$$;
+grant execute on function public.public_projects(int) to anon, authenticated;
+
+-- ADMIN: list users with email + roles
+create or replace function public.admin_list_users(p_search text default null, p_role public.app_role default null, p_limit int default 50, p_offset int default 0)
+returns table (id uuid, email text, full_name text, account_status public.account_status, roles public.app_role[], created_at timestamptz, last_sign_in_at timestamptz, email_confirmed boolean, is_test_data boolean, total bigint)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'not allowed' using errcode='42501'; end if;
+  return query
+  with base as (
+    select u.id, u.email::text, p.full_name, p.account_status,
+           coalesce(array_agg(r.role order by r.role) filter (where r.role is not null), '{}') as roles,
+           u.created_at, u.last_sign_in_at, u.email_confirmed_at is not null as email_confirmed, p.is_test_data
+    from auth.users u join public.profiles p on p.id = u.id
+    left join public.user_roles r on r.user_id = u.id
+    where (p_search is null or u.email ilike '%' || p_search || '%' or p.full_name ilike '%' || p_search || '%')
+    group by u.id, p.id
+  )
+  select b.*, count(*) over () from base b
+  where p_role is null or p_role = any(b.roles)
+  order by b.created_at desc limit least(p_limit, 200) offset greatest(p_offset, 0);
+end $$;
+
+create or replace function public.admin_find_user_by_email(p_email text) returns uuid
+language plpgsql stable security definer set search_path = public as $$
+declare v uuid;
+begin
+  if not public.is_admin() then raise exception 'not allowed' using errcode='42501'; end if;
+  select id into v from auth.users where lower(email) = lower(trim(p_email));
+  return v;
+end $$;
+
+create or replace function public.admin_set_account_status(p_user uuid, p_status public.account_status) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'not allowed' using errcode='42501'; end if;
+  if p_user = auth.uid() then raise exception 'you cannot remove your own administrator role' using errcode='42501'; end if;
+  if public.is_super_admin(p_user) and not public.is_super_admin() then
+    raise exception 'only super administrators can manage admin roles' using errcode='42501'; end if;
+  update public.profiles set account_status = p_status where id = p_user;
+  perform public.write_audit('set_status','profiles', p_user::text, jsonb_build_object('status', p_status));
+end $$;
+
+-- Admin dashboard KPIs in one round trip
+create or replace function public.admin_overview() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'not allowed' using errcode='42501'; end if;
+  return jsonb_build_object(
+    'students', (select count(*) from public.user_roles where role = 'student'),
+    'active_enrollments', (select count(*) from public.enrollments where status = 'active'),
+    'published_courses', (select count(*) from public.courses where status = 'published'),
+    'pending_enrollments', (select count(*) from public.enrollments where status in ('pending_approval')),
+    'pending_links', (select count(*) from public.parent_student_links where status = 'pending'),
+    'pending_projects', (select count(*) from public.student_projects where approval_status = 'pending'),
+    'new_messages', (select count(*) from public.contact_messages where status = 'new'),
+    'pending_scholarships', (select count(*) from public.scholarship_applications where status in ('submitted','under_review')),
+    'paid_orders', (select count(*) from public.orders where status = 'paid'),
+    'paid_total_jod', (select coalesce(sum(total),0) from public.orders where status = 'paid' and currency = 'JOD'),
+    'paid_total_usd', (select coalesce(sum(total),0) from public.orders where status = 'paid' and currency = 'USD'),
+    'enrollments_by_category', (select coalesce(jsonb_agg(x), '[]'::jsonb) from (
+        select c.category, count(*) n from public.enrollments e join public.courses c on c.id = e.course_id
+        where e.status in ('active','completed') group by c.category order by n desc) x)
+  );
+end $$;
+
+-- School coordinator dashboard (tenant-scoped)
+create or replace function public.school_overview(p_org uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not (public.is_org_coordinator(p_org) or public.is_admin()) then raise exception 'not allowed' using errcode='42501'; end if;
+  return jsonb_build_object(
+    'students', (select coalesce(jsonb_agg(s order by s.full_name), '[]'::jsonb) from (
+        select p.id, p.full_name,
+          (select count(*) from public.enrollments e where e.student_id = p.id and e.status in ('active','completed')) as enrollments,
+          (select round(avg(cp.percent)) from public.enrollments e cross join lateral public.course_progress(e.course_id, p.id) cp
+             where e.student_id = p.id and e.status in ('active','completed')) as avg_progress,
+          (select round(100.0 * count(*) filter (where a.status in ('present','late')) / nullif(count(*),0)) from public.attendance a where a.student_id = p.id) as attendance_rate,
+          (select count(*) from public.certificates c where c.student_id = p.id and c.status = 'valid') as certificates
+        from public.organization_members m join public.profiles p on p.id = m.user_id
+        where m.organization_id = p_org and m.member_role = 'student') s),
+    'trainers', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'full_name', p.full_name)), '[]'::jsonb)
+        from public.organization_members m join public.profiles p on p.id = m.user_id where m.organization_id = p_org and m.member_role = 'trainer'),
+    'enrollments', (select coalesce(jsonb_agg(jsonb_build_object('course_title_en', c.title_en, 'course_title_ar', c.title_ar, 'n', x.n)), '[]'::jsonb)
+        from (select e.course_id, count(*) n from public.enrollments e join public.organization_members m on m.user_id = e.student_id
+              and m.organization_id = p_org and m.member_role = 'student' where e.status in ('active','completed') group by e.course_id) x
+        join public.courses c on c.id = x.course_id)
+  );
+end $$;
+
+insert into supabase_migrations.schema_migrations(version, name) values ('20261104000600', '20261104000600_public_helpers.sql') on conflict do nothing;
+
+-- ===== 20261104000700_profile_relations.sql
+-- =====================================================================
+-- WadiTech Academy — 0007 Profile relations for API embedding
+-- profiles.id = auth.users.id, so these FKs are always satisfiable. They let the API join
+-- e.g. enrollments -> profiles(full_name) — still filtered by the profiles RLS policies.
+-- =====================================================================
+alter table public.enrollments add constraint enrollments_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete cascade;
+alter table public.submissions add constraint submissions_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete cascade;
+alter table public.assessment_attempts add constraint attempts_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete cascade;
+alter table public.lab_submissions add constraint lab_submissions_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete cascade;
+alter table public.attendance add constraint attendance_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete cascade;
+alter table public.certificates add constraint certificates_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete restrict;
+alter table public.organization_members add constraint org_members_profile_fkey foreign key (user_id) references public.profiles(id) on delete cascade;
+alter table public.parent_student_links add constraint psl_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete cascade;
+alter table public.parent_student_links add constraint psl_parent_profile_fkey foreign key (parent_id) references public.profiles(id) on delete cascade;
+alter table public.student_projects add constraint projects_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete cascade;
+alter table public.scholarship_applications add constraint sapps_applicant_profile_fkey foreign key (applicant_id) references public.profiles(id) on delete cascade;
+alter table public.competition_teams add constraint teams_captain_profile_fkey foreign key (captain_id) references public.profiles(id) on delete cascade;
+alter table public.course_instructors add constraint ci_trainer_profile_fkey foreign key (trainer_id) references public.profiles(id) on delete cascade;
+alter table public.event_registrations add constraint event_regs_user_profile_fkey foreign key (user_id) references public.profiles(id) on delete cascade;
+alter table public.orders add constraint orders_student_profile_fkey foreign key (student_id) references public.profiles(id) on delete restrict;
+
+-- parents must be able to read the profile basics of the parent account that requested them (for the student) — already covered;
+-- admins see all. Course staff may see the trainer list profiles of their own course (names only via course_trainers()).
+
+insert into supabase_migrations.schema_migrations(version, name) values ('20261104000700', '20261104000700_profile_relations.sql') on conflict do nothing;
+
+-- ===== 20261104000800_trainer_scope.sql
+-- =====================================================================
+-- WadiTech Academy — 0008 Tighten trainer visibility (found by tests/db/rls.test.ts)
+-- Before: a trainer who taught a student in ONE course could read that student's enrollments,
+-- progress, attempts and certificates in EVERY course. Course-scoped tables already grant access
+-- through is_course_staff(course_id), so the generic helper no longer includes trainers.
+-- Trainers keep access to lab submissions and portfolio projects of students they teach (explicit below).
+-- =====================================================================
+create or replace function public.can_view_student(student uuid, uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select student = uid or public.is_admin(uid) or public.is_parent_of(student, uid) or public.coordinates_student(student, uid);
+$$;
+
+drop policy if exists lab_subs_select on public.lab_submissions;
+drop policy if exists lab_subs_update on public.lab_submissions;
+create policy lab_subs_select on public.lab_submissions for select to authenticated
+  using (public.can_view_student(student_id) or public.teaches_student(student_id));
+-- writes: the student (own row) or a trainer who teaches the student; guard_lab_submission restricts columns
+create policy lab_subs_update on public.lab_submissions for update to authenticated
+  using (student_id = auth.uid() or public.is_admin() or public.teaches_student(student_id))
+  with check (student_id = auth.uid() or public.is_admin() or public.teaches_student(student_id));
+
+drop policy if exists projects_select on public.student_projects;
+create policy projects_select on public.student_projects for select to anon, authenticated using (
+  (visibility = 'public' and approval_status = 'approved')
+  or (auth.uid() is not null and (public.can_view_student(student_id) or public.teaches_student(student_id)
+      or (visibility = 'academy' and public.is_active_user()))));
+drop policy if exists projects_update on public.student_projects;
+create policy projects_update on public.student_projects for update to authenticated
+  using (student_id = auth.uid() or public.is_admin()) with check (student_id = auth.uid() or public.is_admin());
+
+insert into supabase_migrations.schema_migrations(version, name) values ('20261104000800', '20261104000800_trainer_scope.sql') on conflict do nothing;
+
+-- ===== seed.sql
+-- =====================================================================
+-- WadiTech Academy — DEVELOPMENT SEED (FICTIONAL TEST DATA ONLY)
+-- Every person, price, date, article and event below is invented for testing.
+-- Rows are flagged is_test_data = true and the UI shows a "Demo data" badge for them.
+-- NEVER load this file into production.
+-- Demo password for every account: (see handover)
+-- =====================================================================
+
+-- ---------- demo accounts ----------
+with u(id, email, name, account_type) as (values
+  ('00000000-0000-4000-a000-000000000001'::uuid, 'superadmin@demo.waditech.local', 'Demo Super Admin', 'student'),
+  ('00000000-0000-4000-a000-000000000002'::uuid, 'admin@demo.waditech.local',      'Demo Admin', 'student'),
+  ('00000000-0000-4000-a000-000000000003'::uuid, 'trainer@demo.waditech.local',    'Demo Trainer Lina', 'student'),
+  ('00000000-0000-4000-a000-000000000004'::uuid, 'trainer2@demo.waditech.local',   'Demo Trainer Kareem', 'student'),
+  ('00000000-0000-4000-a000-000000000005'::uuid, 'student@demo.waditech.local',    'Demo Student Omar', 'student'),
+  ('00000000-0000-4000-a000-000000000006'::uuid, 'student2@demo.waditech.local',   'Demo Student Sara', 'student'),
+  ('00000000-0000-4000-a000-000000000007'::uuid, 'parent@demo.waditech.local',     'Demo Parent Huda', 'parent'),
+  ('00000000-0000-4000-a000-000000000008'::uuid, 'coordinator@demo.waditech.local','Demo School Coordinator', 'student'),
+  ('00000000-0000-4000-a000-000000000009'::uuid, 'student3@demo.waditech.local',   'Demo Student Yazan', 'student'),
+  ('00000000-0000-4000-a000-000000000010'::uuid, 'parent2@demo.waditech.local',    'Demo Parent (unlinked)', 'parent')
+)
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change, email_change_token_current, reauthentication_token, phone_change, phone_change_token)
+select '00000000-0000-0000-0000-000000000000', id, 'authenticated', 'authenticated', email,
+  '$2a$10$6JkTHpu0ucZSeetnEgaopuS2nrG0H1WsqgHgFpyLgLcx/h5L5eYsy', now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  jsonb_build_object('full_name', name, 'account_type', account_type),
+  now(), now(), '', '', '', '', '', '', '', ''
+from u;
+
+insert into auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at)
+select id::text, id, jsonb_build_object('sub', id::text, 'email', email, 'email_verified', true), 'email', now(), now()
+from auth.users where email like '%@demo.waditech.local';
+
+update public.profiles set is_test_data = true where id in (select id from auth.users where email like '%@demo.waditech.local');
+update public.profiles set family_link_code = 'OMAR2026' where id = '00000000-0000-4000-a000-000000000005';
+update public.profiles set family_link_code = 'SARA2026' where id = '00000000-0000-4000-a000-000000000006';
+
+-- privileged roles are granted here directly by the trusted seed session (never through signup)
+delete from public.user_roles where user_id in ('00000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000002',
+  '00000000-0000-4000-a000-000000000003','00000000-0000-4000-a000-000000000004','00000000-0000-4000-a000-000000000008');
+insert into public.user_roles(user_id, role) values
+  ('00000000-0000-4000-a000-000000000001','super_admin'),
+  ('00000000-0000-4000-a000-000000000002','admin'),
+  ('00000000-0000-4000-a000-000000000003','trainer'),
+  ('00000000-0000-4000-a000-000000000004','trainer'),
+  ('00000000-0000-4000-a000-000000000008','school_coordinator');
+
+-- ---------- organization (fictional school) ----------
+insert into public.organizations(id, name, name_ar, slug, type, city, contact_email, is_test_data) values
+  ('0a000000-0000-4000-a000-000000000001','Demo Model School (fictional)','مدرسة تجريبية (وهمية)','demo-model-school','school','Amman','office@demo-school.example', true),
+  ('0a000000-0000-4000-a000-000000000002','Second Demo School (fictional)','مدرسة تجريبية ثانية (وهمية)','second-demo-school','school','Irbid','office@demo-school2.example', true);
+insert into public.organization_members(organization_id, user_id, member_role) values
+  ('0a000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000008','coordinator'),
+  ('0a000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000009','student'),
+  ('0a000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000003','trainer'),
+  ('0a000000-0000-4000-a000-000000000002','00000000-0000-4000-a000-000000000006','student');
+
+insert into public.parent_student_links(parent_id, student_id, status, verified_at) values
+  ('00000000-0000-4000-a000-000000000007','00000000-0000-4000-a000-000000000005','verified', now());
+
+-- ---------- programs (tracks) ----------
+insert into public.programs(id, slug, title_en, title_ar, summary_en, summary_ar, category, position, status, is_test_data, cover_url) values
+ ('0b000000-0000-4000-a000-000000000001','robotics-track','Robotics Track','مسار الروبوتات','Design, build and program robots — from first motors to competition-grade machines.','صمّم وابنِ وبرمج الروبوتات من أول محرك حتى روبوتات المسابقات.','robotics',1,'published',true,'/media/photos/projects-42.webp'),
+ ('0b000000-0000-4000-a000-000000000002','ai-track','Artificial Intelligence Track','مسار الذكاء الاصطناعي','Understand how machines learn and build your first AI projects responsibly.','افهم كيف تتعلم الآلات وابنِ أول مشاريعك في الذكاء الاصطناعي بمسؤولية.','ai',2,'published',true,'/media/photos/classroom-52.webp'),
+ ('0b000000-0000-4000-a000-000000000003','programming-track','Programming Track','مسار البرمجة','Python, C++ and the web — real code, real problem solving.','بايثون و++C والويب: كود حقيقي وحل مشكلات حقيقي.','programming',3,'published',true,'/media/photos/projects-51.webp'),
+ ('0b000000-0000-4000-a000-000000000004','makers-track','Electronics & Makers Track','مسار الإلكترونيات والصناعة','Arduino, IoT, drones and 3D printing for young makers.','أردوينو وإنترنت الأشياء والطائرات المسيّرة والطباعة ثلاثية الأبعاد.','electronics',4,'published',true,'/media/photos/projects-20.webp');
+
+-- ---------- courses ----------
+insert into public.courses(id, program_id, slug, title_en, title_ar, summary_en, summary_ar, description_en, description_ar, category, level, delivery_mode, availability,
+  age_min, age_max, duration_weeks, hours_total, price_amount, currency, capacity, thumbnail_url, cover_url, preview_video_url, outcomes_en, outcomes_ar, requirements_en, requirements_ar, faqs, featured, status, published_at, is_test_data) values
+ ('0c000000-0000-4000-a000-000000000001','0b000000-0000-4000-a000-000000000001','robotics-foundations',
+  'Robotics Foundations','أساسيات الروبوتات',
+  'Build and program your first robot with sensors, motors and logic.','ابنِ وبرمج أول روبوت لك باستخدام الحساسات والمحركات والمنطق.',
+  'A hands-on introduction to robotics. Students assemble a mobile robot, learn how sensors and motors work together, and program behaviours step by step — finishing with a mini challenge.',
+  'مقدمة عملية في الروبوتات: يجمّع الطلاب روبوتًا متحركًا، ويتعلمون كيف تعمل الحساسات والمحركات معًا، ويبرمجون سلوكياته خطوة بخطوة، وينتهي البرنامج بتحدٍّ صغير.',
+  'robotics','beginner','in_person','open',9,13,8,24,0,'JOD',20,'/media/photos/projects-42-sm.webp','/media/photos/projects-42.webp','/media/videos/clip-4.mp4',
+  array['Explain how sensors, controllers and actuators interact','Assemble and wire a mobile robot safely','Program sequences, loops and conditions','Debug a robot that does not behave as expected'],
+  array['شرح كيفية تفاعل الحساسات والمتحكمات والمحركات','تجميع روبوت متحرك وتوصيله بأمان','برمجة التسلسل والتكرار والشروط','اكتشاف أخطاء روبوت لا يعمل كما هو متوقع'],
+  array['No prior experience needed','Curiosity and teamwork'], array['لا تحتاج خبرة سابقة','الفضول والعمل بروح الفريق'],
+  '[{"q_en":"Do students need their own kit?","q_ar":"هل يحتاج الطالب إلى عدة خاصة؟","a_en":"No. Kits are provided during sessions (demo answer).","a_ar":"لا، توفَّر العدد أثناء الحصص (إجابة تجريبية)."}]',
+  true,'published',now(),true),
+ ('0c000000-0000-4000-a000-000000000002','0b000000-0000-4000-a000-000000000003','python-for-young-coders',
+  'Python for Young Coders','بايثون للمبرمجين الصغار',
+  'Learn real programming with Python through games, puzzles and mini projects.','تعلّم البرمجة الحقيقية ببايثون من خلال الألعاب والألغاز والمشاريع الصغيرة.',
+  'Students write real Python from day one: variables, decisions, loops, functions and lists — then combine them into small projects they can show.',
+  'يكتب الطلاب كود بايثون حقيقيًا من اليوم الأول: المتغيرات والقرارات والتكرار والدوال والقوائم، ثم يجمعونها في مشاريع صغيرة يعرضونها.',
+  'programming','beginner','hybrid','open',11,16,10,30,85,'JOD',18,'/media/photos/projects-51-sm.webp','/media/photos/projects-51.webp',null,
+  array['Write and run Python programs','Use variables, conditions and loops','Break problems into functions','Build and present a mini project'],
+  array['كتابة برامج بايثون وتشغيلها','استخدام المتغيرات والشروط والتكرار','تقسيم المشكلات إلى دوال','بناء مشروع صغير وعرضه'],
+  array['Basic computer use','A laptop for online sessions'], array['استخدام أساسي للحاسوب','حاسوب محمول للحصص عن بعد'],
+  '[]', true,'published',now(),true),
+ ('0c000000-0000-4000-a000-000000000003','0b000000-0000-4000-a000-000000000002','ai-explorers',
+  'AI Explorers','مستكشفو الذكاء الاصطناعي',
+  'Discover how AI sees, hears and decides — and train your own model.','اكتشف كيف يرى الذكاء الاصطناعي ويسمع ويقرر، ودرّب نموذجك الخاص.',
+  'An age-appropriate introduction to machine learning: data, training, testing and fairness, using visual no-code tools before moving to simple Python.',
+  'مقدمة مناسبة للعمر في تعلم الآلة: البيانات والتدريب والاختبار والعدالة، باستخدام أدوات مرئية بدون كود ثم بايثون بسيط.',
+  'ai','beginner','in_person','open',12,17,6,18,95,'JOD',16,'/media/photos/classroom-52-sm.webp','/media/photos/classroom-52.webp',null,
+  array['Describe what machine learning is','Collect and label a small dataset','Train and test an image classifier','Discuss responsible AI'],
+  array['وصف مفهوم تعلم الآلة','جمع مجموعة بيانات صغيرة وتصنيفها','تدريب مصنّف صور واختباره','مناقشة الاستخدام المسؤول للذكاء الاصطناعي'],
+  array['Comfortable reading English or Arabic instructions'], array['القدرة على قراءة التعليمات بالعربية أو الإنجليزية'],
+  '[]', true,'published',now(),true),
+ ('0c000000-0000-4000-a000-000000000004','0b000000-0000-4000-a000-000000000004','arduino-electronics',
+  'Arduino & Electronics','أردوينو والإلكترونيات',
+  'Circuits, sensors and microcontrollers — simulate in Wokwi, then build for real.','الدوائر والحساسات والمتحكمات الدقيقة: محاكاة في Wokwi ثم بناء حقيقي.',
+  'Students learn safe circuit building, read sensors and control outputs with Arduino, practising first in an online simulator.',
+  'يتعلم الطلاب بناء الدوائر بأمان وقراءة الحساسات والتحكم بالمخرجات باستخدام أردوينو، مع التدريب أولًا على محاكٍ إلكتروني.',
+  'electronics','intermediate','in_person','waitlist',12,18,8,24,110,'JOD',14,'/media/photos/projects-20-sm.webp','/media/photos/projects-20.webp',null,
+  array['Build circuits on a breadboard','Program Arduino inputs and outputs','Simulate projects in Wokwi'], array['بناء الدوائر على لوحة التجارب','برمجة مداخل ومخارج أردوينو','محاكاة المشاريع في Wokwi'],
+  array['Robotics Foundations or equivalent'], array['أساسيات الروبوتات أو ما يعادلها'], '[]', false,'published',now(),true),
+ ('0c000000-0000-4000-a000-000000000005','0b000000-0000-4000-a000-000000000004','drones-and-flight',
+  'Drones & Flight Systems','الطائرات المسيّرة وأنظمة الطيران',
+  'How drones fly, stay stable and stay safe — with supervised practice.','كيف تطير الطائرات المسيّرة وتحافظ على توازنها وسلامتها، مع تدريب تحت الإشراف.',
+  'Physics of flight, flight controllers, safety rules and supervised simulator and indoor practice.',
+  'فيزياء الطيران ووحدات التحكم وقواعد السلامة والتدريب على المحاكي وفي الأماكن المغلقة تحت الإشراف.',
+  'drones','intermediate','in_person','coming_soon',14,18,6,18,150,'JOD',10,'/media/photos/projects-64-sm.webp','/media/photos/projects-64.webp',null,
+  array['Explain lift, thrust and stability','Follow drone safety procedures'], array['شرح قوة الرفع والدفع والاتزان','اتباع إجراءات سلامة الطائرات المسيّرة'],
+  array['Age 14+'], array['العمر 14 سنة فأكثر'], '[]', false,'published',now(),true),
+ ('0c000000-0000-4000-a000-000000000006','0b000000-0000-4000-a000-000000000003','cyber-safety-ctf',
+  'Cybersecurity Basics & CTF','أساسيات الأمن السيبراني وتحديات CTF',
+  'Think like a defender: passwords, networks and safe capture-the-flag puzzles.','فكّر كمدافع: كلمات المرور والشبكات وألغاز CTF آمنة.',
+  'Ethical, isolated exercises on digital safety, encryption basics and puzzle-style challenges. No attacks on real systems.',
+  'تمارين أخلاقية ومعزولة عن السلامة الرقمية وأساسيات التشفير وتحديات على شكل ألغاز، دون أي هجوم على أنظمة حقيقية.',
+  'cybersecurity','beginner','online','open',13,18,6,12,60,'USD',25,'/media/photos/projects-36-sm.webp','/media/photos/projects-36.webp',null,
+  array['Create strong authentication habits','Explain basic encryption','Solve beginner CTF challenges ethically'], array['بناء عادات قوية للمصادقة','شرح أساسيات التشفير','حل تحديات CTF للمبتدئين بشكل أخلاقي'],
+  array['Laptop with a modern browser'], array['حاسوب محمول ومتصفح حديث'], '[]', false,'published',now(),true),
+ ('0c000000-0000-4000-a000-000000000007','0b000000-0000-4000-a000-000000000004','3d-design-printing',
+  '3D Design & Printing','التصميم والطباعة ثلاثية الأبعاد',
+  'From idea to object: model in Tinkercad and print your design.','من الفكرة إلى المجسم: صمّم في Tinkercad واطبع تصميمك.',
+  'Students learn 3D modelling fundamentals and printing workflow, producing a functional part.',
+  'يتعلم الطلاب أساسيات النمذجة ثلاثية الأبعاد ومراحل الطباعة، وينتجون قطعة وظيفية.',
+  '3d_printing','beginner','in_person','open',10,16,4,12,0,'JOD',12,'/media/photos/projects-18-sm.webp','/media/photos/projects-18.webp',null,
+  array['Model objects in Tinkercad','Prepare a model for printing'], array['نمذجة المجسمات في Tinkercad','تجهيز النموذج للطباعة'],
+  array['None'], array['لا يوجد'], '[]', false,'published',now(),true),
+ ('0c000000-0000-4000-a000-000000000008','0b000000-0000-4000-a000-000000000001','competition-robotics',
+  'Competition Robotics (Sumo)','روبوتات المسابقات (سومو)',
+  'Design, tune and test sumo robots for national-style competitions.','صمّم واضبط واختبر روبوتات السومو لمسابقات بأسلوب البطولات الوطنية.',
+  'Advanced team-based programme preparing students for robot sumo: mechanical design, sensor strategy and match tactics.',
+  'برنامج متقدم قائم على الفرق لإعداد الطلاب لمسابقات روبوتات السومو: التصميم الميكانيكي واستراتيجية الحساسات وتكتيكات المباراة.',
+  'robotics','advanced','in_person','open',13,18,10,40,140,'JOD',12,'/media/photos/competition-29-sm.webp','/media/photos/competition-29.webp','/media/videos/clip-2.mp4',
+  array['Design a competitive chassis','Program sensor-based strategies','Work as a competition team'], array['تصميم هيكل تنافسي','برمجة استراتيجيات قائمة على الحساسات','العمل كفريق مسابقات'],
+  array['Robotics Foundations'], array['أساسيات الروبوتات'], '[]', true,'published',now(),true),
+ ('0c000000-0000-4000-a000-000000000009','0b000000-0000-4000-a000-000000000002','draft-ml-lab',
+  'Machine Learning Lab (draft)','مختبر تعلم الآلة (مسودة)', 'Unpublished draft course used for testing.','دورة غير منشورة لأغراض الاختبار.',
+  null,null,'ai','advanced','online','closed',15,18,8,24,120,'USD',20,null,null,null,'{}','{}','{}','{}','[]',false,'draft',null,true);
+
+insert into public.course_instructors(course_id, trainer_id, is_lead) values
+ ('0c000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000003',true),
+ ('0c000000-0000-4000-a000-000000000002','00000000-0000-4000-a000-000000000004',true),
+ ('0c000000-0000-4000-a000-000000000003','00000000-0000-4000-a000-000000000004',true),
+ ('0c000000-0000-4000-a000-000000000004','00000000-0000-4000-a000-000000000003',true),
+ ('0c000000-0000-4000-a000-000000000008','00000000-0000-4000-a000-000000000003',true),
+ ('0c000000-0000-4000-a000-000000000006','00000000-0000-4000-a000-000000000004',true),
+ ('0c000000-0000-4000-a000-000000000007','00000000-0000-4000-a000-000000000003',true);
+
+-- ---------- curriculum: Robotics Foundations (fully built) ----------
+insert into public.course_modules(id, course_id, title_en, title_ar, position) values
+ ('0d000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','Meet your robot','تعرّف على روبوتك',1),
+ ('0d000000-0000-4000-a000-000000000002','0c000000-0000-4000-a000-000000000001','Sensors & decisions','الحساسات واتخاذ القرار',2),
+ ('0d000000-0000-4000-a000-000000000003','0c000000-0000-4000-a000-000000000002','Python basics','أساسيات بايثون',1),
+ ('0d000000-0000-4000-a000-000000000004','0c000000-0000-4000-a000-000000000003','What is AI?','ما هو الذكاء الاصطناعي؟',1);
+
+insert into public.assessments(id, course_id, title_en, title_ar, description_en, description_ar, pass_percent, max_attempts) values
+ ('0e000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','Robot parts check','اختبار أجزاء الروبوت','Five quick questions about how robots sense and act.','خمسة أسئلة سريعة عن كيف تستشعر الروبوتات وتتحرك.',60,3),
+ ('0e000000-0000-4000-a000-000000000002','0c000000-0000-4000-a000-000000000002','Python warm-up quiz','اختبار تمهيدي في بايثون','Variables and printing.','المتغيرات والطباعة.',50,null);
+
+insert into public.questions(id, assessment_id, kind, prompt_en, prompt_ar, explanation_en, explanation_ar, points, position) values
+ ('0f000000-0000-4000-a000-000000000001','0e000000-0000-4000-a000-000000000001','single_choice','Which part lets a robot measure distance to an obstacle?','أي جزء يسمح للروبوت بقياس المسافة إلى عائق؟','Ultrasonic sensors send sound pulses and time the echo.','الحساس فوق الصوتي يرسل نبضات صوتية ويقيس زمن الصدى.',1,1),
+ ('0f000000-0000-4000-a000-000000000002','0e000000-0000-4000-a000-000000000001','single_choice','What is the job of the microcontroller?','ما وظيفة المتحكم الدقيق؟','It runs the program that reads sensors and controls motors.','يشغّل البرنامج الذي يقرأ الحساسات ويتحكم بالمحركات.',1,2),
+ ('0f000000-0000-4000-a000-000000000003','0e000000-0000-4000-a000-000000000001','multiple_choice','Which of these are actuators? (choose all)','أي مما يلي يُعدّ مشغلات (محركات)؟ (اختر كل ما ينطبق)','Motors and servos create movement; a light sensor only measures.','المحركات والسيرفو تُحدث الحركة، أما حساس الضوء فيقيس فقط.',2,3),
+ ('0f000000-0000-4000-a000-000000000004','0e000000-0000-4000-a000-000000000001','short_answer','Type the name of the loop that repeats forever in Arduino code.','اكتب اسم الدالة التي تتكرر إلى الأبد في كود أردوينو.','Arduino sketches use setup() once and loop() repeatedly.','يستخدم أردوينو setup مرة واحدة و loop بشكل متكرر.',1,4),
+ ('0f000000-0000-4000-a000-000000000005','0e000000-0000-4000-a000-000000000002','single_choice','What does print("Hi") do?','ماذا يفعل print("Hi")؟',null,null,1,1),
+ ('0f000000-0000-4000-a000-000000000006','0e000000-0000-4000-a000-000000000002','short_answer','In one sentence: why do we use variables?','في جملة واحدة: لماذا نستخدم المتغيرات؟',null,null,1,2);
+
+insert into public.answer_options(id, question_id, label_en, label_ar, position) values
+ ('1a000000-0000-4000-a000-000000000001','0f000000-0000-4000-a000-000000000001','Ultrasonic sensor','حساس فوق صوتي',1),
+ ('1a000000-0000-4000-a000-000000000002','0f000000-0000-4000-a000-000000000001','Battery','البطارية',2),
+ ('1a000000-0000-4000-a000-000000000003','0f000000-0000-4000-a000-000000000001','Wheel','العجلة',3),
+ ('1a000000-0000-4000-a000-000000000004','0f000000-0000-4000-a000-000000000002','Stores electricity','يخزن الكهرباء',1),
+ ('1a000000-0000-4000-a000-000000000005','0f000000-0000-4000-a000-000000000002','Runs the program and makes decisions','يشغّل البرنامج ويتخذ القرارات',2),
+ ('1a000000-0000-4000-a000-000000000006','0f000000-0000-4000-a000-000000000002','Measures light','يقيس الضوء',3),
+ ('1a000000-0000-4000-a000-000000000007','0f000000-0000-4000-a000-000000000003','DC motor','محرك تيار مستمر',1),
+ ('1a000000-0000-4000-a000-000000000008','0f000000-0000-4000-a000-000000000003','Servo motor','محرك سيرفو',2),
+ ('1a000000-0000-4000-a000-000000000009','0f000000-0000-4000-a000-000000000003','Light sensor','حساس الضوء',3),
+ ('1a000000-0000-4000-a000-000000000010','0f000000-0000-4000-a000-000000000005','Shows Hi on the screen','يعرض Hi على الشاشة',1),
+ ('1a000000-0000-4000-a000-000000000011','0f000000-0000-4000-a000-000000000005','Deletes a file','يحذف ملفًا',2);
+
+insert into public.question_keys(question_id, correct_option_ids, accepted_answers) values
+ ('0f000000-0000-4000-a000-000000000001', array['1a000000-0000-4000-a000-000000000001'::uuid], '{}'),
+ ('0f000000-0000-4000-a000-000000000002', array['1a000000-0000-4000-a000-000000000005'::uuid], '{}'),
+ ('0f000000-0000-4000-a000-000000000003', array['1a000000-0000-4000-a000-000000000007'::uuid,'1a000000-0000-4000-a000-000000000008'::uuid], '{}'),
+ ('0f000000-0000-4000-a000-000000000004', '{}', array['loop','loop()','void loop()']),
+ ('0f000000-0000-4000-a000-000000000005', array['1a000000-0000-4000-a000-000000000010'::uuid], '{}');
+-- q6 has no key on purpose -> manual review workflow
+
+insert into public.assignments(id, course_id, title_en, title_ar, instructions_en, instructions_ar, due_at, max_points) values
+ ('1b000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','Design an obstacle-avoiding behaviour','صمّم سلوكًا لتفادي العوائق',
+  'Describe (or paste your code for) a robot behaviour that stops and turns when an obstacle is closer than 15 cm. Add a link to a photo or video if you have one.',
+  'صف (أو الصق الكود الخاص بـ) سلوك روبوت يتوقف ويستدير عندما يقترب العائق لأقل من 15 سم. أضف رابطًا لصورة أو فيديو إن وجد.',
+  now() + interval '21 days', 20);
+
+insert into public.labs(id, slug, category, title_en, title_ar, summary_en, summary_ar, instructions_en, instructions_ar, provider, launch_url, embed_allowed, level, status, position) values
+ ('1c000000-0000-4000-a000-000000000001','arduino-blink-wokwi','electronics','Arduino Blink & Traffic Light','أردوينو: وميض وإشارة مرور','Simulate an Arduino Uno and build a traffic light.','حاكِ أردوينو أونو وابنِ إشارة مرور.',
+  '1. Launch Wokwi and create a new Arduino Uno project. 2. Add three LEDs with resistors. 3. Program the red–yellow–green sequence. 4. Save the project and submit its share link.',
+  '١. افتح Wokwi وأنشئ مشروع Arduino Uno جديدًا. ٢. أضف ثلاثة مصابيح LED مع مقاومات. ٣. برمج تسلسل الأحمر ثم الأصفر ثم الأخضر. ٤. احفظ المشروع وأرسل رابط المشاركة.',
+  'wokwi','https://wokwi.com/projects/new/arduino-uno',false,'beginner','published',1),
+ ('1c000000-0000-4000-a000-000000000002','robot-logic-challenges','robotics','Robot Logic Challenges','تحديات منطق الروبوت','Plan robot paths with sequences and conditions.','خطّط مسارات الروبوت بالتسلسل والشروط.',
+  'Work through the challenge sheet from your trainer, then submit a link to your solution (document, video or code).',
+  'حلّ تحديات ورقة العمل من المدرب، ثم أرسل رابط حلك (مستند أو فيديو أو كود).','internal',null,false,'beginner','published',2),
+ ('1c000000-0000-4000-a000-000000000003','python-playground','programming','Python Playground','ساحة بايثون','Practise Python in your browser.','تدرّب على بايثون في المتصفح.',
+  'Open the online Python environment, solve the exercise from your lesson, and submit a share link.','افتح بيئة بايثون على الإنترنت، وحلّ تمرين الدرس، ثم أرسل رابط المشاركة.',
+  'python_online','https://www.online-python.com/',false,'beginner','published',3),
+ ('1c000000-0000-4000-a000-000000000004','teachable-machine-intro','ai','Train an Image Classifier','درّب مصنّف صور','Use Teachable Machine to train a model with your own examples.','استخدم Teachable Machine لتدريب نموذج بأمثلتك الخاصة.',
+  'Create an image project with at least two classes, train it, test it with new images, and export the shareable link.','أنشئ مشروع صور بصنفين على الأقل، ودرّبه، واختبره بصور جديدة، ثم صدّر رابط المشاركة.',
+  'teachable_machine','https://teachablemachine.withgoogle.com/',false,'beginner','published',4),
+ ('1c000000-0000-4000-a000-000000000005','cyber-ctf-starter','cybersecurity','CTF Starter Puzzles','ألغاز CTF للمبتدئين','Safe, offline-style puzzles on encoding and passwords.','ألغاز آمنة عن الترميز وكلمات المرور.',
+  'Solve the puzzles your trainer assigns in the isolated exercise environment. Never test techniques on real systems.','حلّ الألغاز التي يحددها المدرب داخل بيئة التمارين المعزولة. لا تجرّب أي أسلوب على أنظمة حقيقية.',
+  'internal',null,false,'beginner','published',5),
+ ('1c000000-0000-4000-a000-000000000006','tinkercad-keychain','3d_design','Design a 3D Keychain','صمّم ميدالية ثلاثية الأبعاد','Model a printable keychain in Tinkercad.','صمّم ميدالية قابلة للطباعة في Tinkercad.',
+  'Sign in to Tinkercad with your class code, design a keychain under 5 cm, and share the design link.','ادخل إلى Tinkercad برمز الصف، وصمّم ميدالية أقل من 5 سم، وشارك رابط التصميم.',
+  'tinkercad','https://www.tinkercad.com/',false,'beginner','published',6);
+
+insert into public.lessons(id, module_id, course_id, title_en, title_ar, type, body_en, body_ar, video_url, duration_minutes, position, is_preview, completion_rule, assessment_id, assignment_id, lab_id) values
+ ('1d000000-0000-4000-a000-000000000001','0d000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','Welcome: what is a robot?','مرحبًا: ما هو الروبوت؟','text',
+  E'A robot is a machine that can **sense**, **think** and **act**.\n\n- **Sense**: sensors measure the world (distance, light, touch).\n- **Think**: a microcontroller runs your program.\n- **Act**: motors and servos move the robot.\n\nIn this course you will build all three.',
+  E'الروبوت آلة تستطيع أن **تستشعر** و**تفكر** و**تتحرك**.\n\n- **الاستشعار**: الحساسات تقيس العالم (المسافة، الضوء، اللمس).\n- **التفكير**: المتحكم الدقيق يشغّل برنامجك.\n- **الحركة**: المحركات والسيرفو تحرك الروبوت.\n\nفي هذه الدورة ستبني الأجزاء الثلاثة.',
+  null,10,1,true,'view',null,null,null),
+ ('1d000000-0000-4000-a000-000000000002','0d000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','Robots in action (video)','الروبوتات أثناء العمل (فيديو)','video',
+  'Watch students test robots in the lab. Notice what each robot senses before it moves.','شاهد الطلاب وهم يختبرون الروبوتات في المختبر. لاحظ ما يستشعره كل روبوت قبل أن يتحرك.',
+  '/media/videos/clip-1.mp4',3,2,false,'video_90',null,null,null),
+ ('1d000000-0000-4000-a000-000000000003','0d000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','Simulate your first circuit','حاكِ أول دائرة لك','lab',
+  'Open the Wokwi lab and blink an LED. Submit your share link from the Labs page.','افتح مختبر Wokwi واجعل مصباح LED يومض. أرسل رابط المشاركة من صفحة المختبرات.',
+  null,20,3,false,'view',null,null,'1c000000-0000-4000-a000-000000000001'),
+ ('1d000000-0000-4000-a000-000000000004','0d000000-0000-4000-a000-000000000002','0c000000-0000-4000-a000-000000000001','How sensors decide','كيف تساعد الحساسات في اتخاذ القرار','text',
+  E'Robots make decisions with **if / else**:\n\n```\nif distance < 15:\n    stop()\n    turn_left()\nelse:\n    forward()\n```\n\nThe robot checks the sensor many times per second.',
+  E'تتخذ الروبوتات قراراتها باستخدام **if / else**:\n\n```\nif distance < 15:\n    stop()\n    turn_left()\nelse:\n    forward()\n```\n\nيفحص الروبوت الحساس مرات كثيرة في الثانية.',
+  null,15,1,false,'view',null,null,null),
+ ('1d000000-0000-4000-a000-000000000005','0d000000-0000-4000-a000-000000000002','0c000000-0000-4000-a000-000000000001','Quiz: robot parts','اختبار: أجزاء الروبوت','quiz',
+  'Pass with 60% or more to complete this lesson.','اجتز الاختبار بنسبة 60% أو أكثر لإكمال هذا الدرس.',null,10,2,false,'quiz_pass','0e000000-0000-4000-a000-000000000001',null,null),
+ ('1d000000-0000-4000-a000-000000000006','0d000000-0000-4000-a000-000000000002','0c000000-0000-4000-a000-000000000001','Assignment: avoid the obstacle','واجب: تفادي العائق','assignment',
+  'Submit your design. Your trainer will review it.','أرسل تصميمك وسيراجعه المدرب.',null,30,3,false,'assignment_submitted',null,'1b000000-0000-4000-a000-000000000001',null),
+ ('1d000000-0000-4000-a000-000000000007','0d000000-0000-4000-a000-000000000003','0c000000-0000-4000-a000-000000000002','Your first program','برنامجك الأول','text',
+  E'Open the Python playground and type:\n\n```python\nname = "WadiTech"\nprint("Hello", name)\n```','افتح ساحة بايثون واكتب:\n\n```python\nname = "WadiTech"\nprint("Hello", name)\n```',null,15,1,true,'view',null,null,null),
+ ('1d000000-0000-4000-a000-000000000008','0d000000-0000-4000-a000-000000000003','0c000000-0000-4000-a000-000000000002','Warm-up quiz','الاختبار التمهيدي','quiz','Pass with 50%.','اجتز بنسبة 50%.',null,5,2,false,'quiz_pass','0e000000-0000-4000-a000-000000000002',null,null),
+ ('1d000000-0000-4000-a000-000000000009','0d000000-0000-4000-a000-000000000004','0c000000-0000-4000-a000-000000000003','Machines that learn','آلات تتعلم','text',
+  'AI systems learn patterns from examples (data). Better, fairer data usually means better results.','تتعلم أنظمة الذكاء الاصطناعي الأنماط من الأمثلة (البيانات). البيانات الأفضل والأكثر عدالة تعني غالبًا نتائج أفضل.',null,10,1,true,'view',null,null,null);
+
+insert into public.lesson_resources(lesson_id, title, url, kind, position) values
+ ('1d000000-0000-4000-a000-000000000004','Sample obstacle-avoidance pseudocode','https://wokwi.com/projects/new/arduino-uno','link',1);
+
+insert into public.class_sessions(id, course_id, title, starts_at, ends_at, location) values
+ ('1e000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','Session 1 (demo)', now() - interval '7 days', now() - interval '7 days' + interval '2 hours','Lab A (demo)'),
+ ('1e000000-0000-4000-a000-000000000002','0c000000-0000-4000-a000-000000000001','Session 2 (demo)', now() + interval '2 days', now() + interval '2 days' + interval '2 hours','Lab A (demo)');
+
+-- enrollments (bypass the function in the trusted seed session)
+insert into public.enrollments(id, course_id, student_id, status, source, activated_at, organization_id) values
+ ('1f000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000005','active','self', now() - interval '10 days', null),
+ ('1f000000-0000-4000-a000-000000000002','0c000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000006','active','self', now() - interval '10 days', '0a000000-0000-4000-a000-000000000002'),
+ ('1f000000-0000-4000-a000-000000000003','0c000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000009','active','school', now() - interval '9 days', '0a000000-0000-4000-a000-000000000001'),
+ ('1f000000-0000-4000-a000-000000000004','0c000000-0000-4000-a000-000000000003','00000000-0000-4000-a000-000000000009','completed','school', now() - interval '60 days', '0a000000-0000-4000-a000-000000000001');
+update public.enrollments set completed_at = now() - interval '5 days' where id = '1f000000-0000-4000-a000-000000000004';
+
+insert into public.lesson_progress(student_id, lesson_id, course_id, status, completed_at) values
+ ('00000000-0000-4000-a000-000000000005','1d000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','completed', now() - interval '9 days'),
+ ('00000000-0000-4000-a000-000000000009','1d000000-0000-4000-a000-000000000009','0c000000-0000-4000-a000-000000000003','completed', now() - interval '20 days');
+
+insert into public.attendance(session_id, student_id, course_id, status) values
+ ('1e000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000005','0c000000-0000-4000-a000-000000000001','present'),
+ ('1e000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000006','0c000000-0000-4000-a000-000000000001','late'),
+ ('1e000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000009','0c000000-0000-4000-a000-000000000001','present');
+
+insert into public.submissions(assignment_id, course_id, student_id, body_text, link_url) values
+ ('1b000000-0000-4000-a000-000000000001','0c000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000006',
+  'If the ultrasonic reading is below 15 cm the robot stops, reverses for half a second and turns right. (demo submission)', null);
+
+insert into public.certificates(certificate_number, enrollment_id, student_id, course_id, student_name, course_title_en, course_title_ar, hours_total, completion_date, issued_by, is_test_data) values
+ ('WT-2026-DEMO0001','1f000000-0000-4000-a000-000000000004','00000000-0000-4000-a000-000000000009','0c000000-0000-4000-a000-000000000003','Demo Student Yazan','AI Explorers','مستكشفو الذكاء الاصطناعي',18, current_date - 5,'00000000-0000-4000-a000-000000000004', true);
+
+-- ---------- news / events / competitions / scholarships ----------
+insert into public.news_articles(slug, title_en, title_ar, excerpt_en, excerpt_ar, body_en, body_ar, cover_url, category, status, published_at, featured, is_breaking, is_test_data) values
+ ('demo-sumo-championship-recap','[Demo] Students compete in a national sumo robot championship','[تجريبي] طلابنا يشاركون في بطولة وطنية لروبوتات السومو',
+  'Sample article: a recap of a robot sumo competition day.','مقال تجريبي: ملخص يوم مسابقة روبوتات السومو.',
+  E'This is placeholder text for a news article. Replace it with the approved WadiTech story before publishing.\n\nTeams prepared their robots for weeks, tested sensor strategies and learned how to adapt between rounds.',
+  E'هذا نص تجريبي لمقال إخباري. استبدله بالقصة المعتمدة من وادي تك قبل النشر.\n\nجهّزت الفرق روبوتاتها لأسابيع، واختبرت استراتيجيات الحساسات، وتعلمت كيف تتكيف بين الجولات.',
+  '/media/photos/competition-29.webp','achievement','published', now() - interval '3 days', true, false, true),
+ ('demo-new-ai-programme','[Demo] New AI Explorers programme opens for registration','[تجريبي] فتح باب التسجيل في برنامج مستكشفي الذكاء الاصطناعي',
+  'Sample announcement for the AI Explorers course.','إعلان تجريبي عن دورة مستكشفي الذكاء الاصطناعي.',
+  'Placeholder announcement body. Dates and prices shown on the platform are demo values.','نص إعلان تجريبي. التواريخ والأسعار المعروضة قيم تجريبية.',
+  '/media/photos/classroom-52.webp','announcement','published', now() - interval '1 day', false, true, true),
+ ('demo-drone-showcase','[Demo] Student drone projects showcased at a university exhibition','[تجريبي] عرض مشاريع طلابية للطائرات المسيّرة في معرض جامعي',
+  'Sample article about student drone projects.','مقال تجريبي عن مشاريع الطائرات المسيّرة الطلابية.',
+  'Placeholder body text for the drone showcase article.','نص تجريبي لمقال معرض الطائرات المسيّرة.',
+  '/media/photos/competition-61.webp','news','published', now() - interval '8 days', false, false, true),
+ ('demo-draft-article','[Demo] Draft article (not public)','[تجريبي] مقال مسودة (غير منشور)','Draft.','مسودة.','Draft body.','نص المسودة.',null,'article','draft',null,false,false,true);
+
+insert into public.events(slug, title_en, title_ar, description_en, description_ar, starts_at, ends_at, location_en, location_ar, capacity, status, cover_url, course_id, is_test_data) values
+ ('demo-open-lab-day','[Demo] Open Lab Day','[تجريبي] يوم المختبر المفتوح','Families visit the lab, try robots and meet trainers (sample event).','تزور العائلات المختبر وتجرب الروبوتات وتلتقي المدربين (فعالية تجريبية).',
+  date_trunc('day', now()) + interval '12 days' + interval '10 hours', date_trunc('day', now()) + interval '12 days' + interval '13 hours','WadiTech Lab, Amman (demo)','مختبر وادي تك، عمّان (تجريبي)',3,'published','/media/brand/lab-entrance.webp',null,true),
+ ('demo-python-workshop','[Demo] Python Taster Workshop','[تجريبي] ورشة تعريفية في بايثون','A two-hour taster for ages 11–16 (sample event).','ورشة تعريفية لمدة ساعتين للأعمار 11–16 (فعالية تجريبية).',
+  date_trunc('day', now()) + interval '20 days' + interval '16 hours', date_trunc('day', now()) + interval '20 days' + interval '18 hours','Online (demo)','عن بعد (تجريبي)',40,'published','/media/photos/projects-51.webp','0c000000-0000-4000-a000-000000000002',true),
+ ('demo-past-exhibition','[Demo] Student Projects Exhibition','[تجريبي] معرض مشاريع الطلاب','A past sample event.','فعالية سابقة تجريبية.',
+  now() - interval '30 days', now() - interval '30 days' + interval '4 hours','Amman (demo)','عمّان (تجريبي)',null,'completed','/media/photos/competition-65.webp',null,true);
+
+insert into public.competitions(slug, title_en, title_ar, description_en, description_ar, category, eligibility_en, eligibility_ar, team_min, team_max, age_min, age_max, registration_deadline, event_date, status, cover_url, is_test_data) values
+ ('demo-sumo-challenge','[Demo] WadiTech Sumo Challenge','[تجريبي] تحدي وادي تك للسومو','Teams build autonomous sumo robots (sample competition).','تبني الفرق روبوتات سومو ذاتية التشغيل (مسابقة تجريبية).','robotics',
+  'Ages 12–18, teams of 2–4.','الأعمار 12–18، فرق من 2 إلى 4.',2,4,12,18, now() + interval '25 days', (now() + interval '40 days')::date,'open','/media/photos/competition-22.webp',true),
+ ('demo-ai-for-good','[Demo] AI for Good Mini-Hackathon','[تجريبي] هاكاثون مصغر: الذكاء الاصطناعي من أجل الخير','Propose an AI idea that helps your community (sample).','اقترح فكرة ذكاء اصطناعي تخدم مجتمعك (تجريبي).','ai',
+  'Ages 13–18, teams of 1–3.','الأعمار 13–18، فرق من 1 إلى 3.',1,3,13,18, now() + interval '45 days', (now() + interval '60 days')::date,'open','/media/photos/classroom-49.webp',true);
+
+insert into public.scholarships(slug, title_en, title_ar, description_en, description_ar, criteria_en, criteria_ar, coverage_percent, course_id, deadline, status, is_test_data) values
+ ('demo-future-innovators','[Demo] Future Innovators Scholarship','[تجريبي] منحة مبتكري المستقبل','Sample scholarship covering part of a programme fee.','منحة تجريبية تغطي جزءًا من رسوم البرنامج.',
+  'Motivated students aged 11–17; short statement required.','طلاب متحمسون بعمر 11–17؛ مطلوب بيان قصير.',50,'0c000000-0000-4000-a000-000000000002', now() + interval '30 days','open',true);
+
+insert into public.discount_codes(code, percent_off, max_uses) values ('DEMO10', 10, 100);
+
+insert into public.student_projects(student_id, course_id, title, description, cover_url, visibility, approval_status, is_test_data) values
+ ('00000000-0000-4000-a000-000000000009','0c000000-0000-4000-a000-000000000003','[Demo] Recycling sorter classifier','A sample project: an image classifier that sorts plastic, paper and metal.','/media/photos/projects-14.webp','public','approved',true),
+ ('00000000-0000-4000-a000-000000000005','0c000000-0000-4000-a000-000000000001','[Demo] Line-following robot','Sample project for portfolio testing.','/media/photos/projects-44.webp','public','approved',true),
+ ('00000000-0000-4000-a000-000000000006',null,'[Demo] Smart plant monitor (pending review)','Sample project awaiting approval.','/media/photos/projects-16.webp','public','pending',true);
+
+insert into public.notifications(user_id, kind, title_en, title_ar, body_en, body_ar, link) values
+ ('00000000-0000-4000-a000-000000000005','announcement','Welcome to the demo environment','مرحبًا بك في بيئة التجربة','All data you see here is fictional test data.','جميع البيانات هنا بيانات اختبار وهمية.','/dashboard');
+
+
+-- ===== seed-media.sql
+-- Media library seed (generated by scripts/build-media-seed). Files supplied by WadiTech.
+-- consent_status = 'granted' here is a DEVELOPMENT assumption so the gallery renders.
+-- Before production, an administrator must confirm recorded parental consent for every item showing students.
+insert into public.media_assets(kind,url,poster_url,title_en,title_ar,alt_en,alt_ar,category,width,height,shows_students,consent_status,is_public) values
+('image','/media/photos/competition-22.webp','/media/photos/competition-22-sm.webp','Competition day','يوم المسابقة','Competition day — WadiTech Academy','يوم المسابقة — أكاديمية وادي تك','competition',1200,1600,true,'granted',true),
+('image','/media/photos/competition-29.webp','/media/photos/competition-29-sm.webp','Competition day','يوم المسابقة','Competition day — WadiTech Academy','يوم المسابقة — أكاديمية وادي تك','competition',1600,1200,true,'granted',true),
+('image','/media/photos/competition-31.webp','/media/photos/competition-31-sm.webp','Competition day','يوم المسابقة','Competition day — WadiTech Academy','يوم المسابقة — أكاديمية وادي تك','competition',1600,1200,true,'granted',true),
+('image','/media/photos/competition-46.webp','/media/photos/competition-46-sm.webp','Competition day','يوم المسابقة','Competition day — WadiTech Academy','يوم المسابقة — أكاديمية وادي تك','competition',1600,1066,true,'granted',true),
+('image','/media/photos/competition-47.webp','/media/photos/competition-47-sm.webp','Competition day','يوم المسابقة','Competition day — WadiTech Academy','يوم المسابقة — أكاديمية وادي تك','competition',1600,1200,true,'granted',true),
+('image','/media/photos/competition-61.webp','/media/photos/competition-61-sm.webp','Competition day','يوم المسابقة','Competition day — WadiTech Academy','يوم المسابقة — أكاديمية وادي تك','competition',1600,1200,true,'granted',true),
+('image','/media/photos/competition-65.webp','/media/photos/competition-65-sm.webp','Competition day','يوم المسابقة','Competition day — WadiTech Academy','يوم المسابقة — أكاديمية وادي تك','competition',1600,1200,true,'granted',true),
+('image','/media/photos/competition-23.webp','/media/photos/competition-23-sm.webp','Competition day','يوم المسابقة','Competition day — WadiTech Academy','يوم المسابقة — أكاديمية وادي تك','competition',1200,1600,true,'granted',true),
+('image','/media/photos/classroom-01.webp','/media/photos/classroom-01-sm.webp','In the classroom','داخل الصف','In the classroom — WadiTech Academy','داخل الصف — أكاديمية وادي تك','classroom',1600,1200,true,'granted',true),
+('image','/media/photos/classroom-40.webp','/media/photos/classroom-40-sm.webp','In the classroom','داخل الصف','In the classroom — WadiTech Academy','داخل الصف — أكاديمية وادي تك','classroom',1600,1200,true,'granted',true),
+('image','/media/photos/classroom-41.webp','/media/photos/classroom-41-sm.webp','In the classroom','داخل الصف','In the classroom — WadiTech Academy','داخل الصف — أكاديمية وادي تك','classroom',1600,1200,true,'granted',true),
+('image','/media/photos/classroom-49.webp','/media/photos/classroom-49-sm.webp','In the classroom','داخل الصف','In the classroom — WadiTech Academy','داخل الصف — أكاديمية وادي تك','classroom',1600,1200,true,'granted',true),
+('image','/media/photos/classroom-52.webp','/media/photos/classroom-52-sm.webp','In the classroom','داخل الصف','In the classroom — WadiTech Academy','داخل الصف — أكاديمية وادي تك','classroom',1600,1008,true,'granted',true),
+('image','/media/photos/classroom-58.webp','/media/photos/classroom-58-sm.webp','In the classroom','داخل الصف','In the classroom — WadiTech Academy','داخل الصف — أكاديمية وادي تك','classroom',1440,1440,true,'granted',true),
+('image','/media/photos/classroom-59.webp','/media/photos/classroom-59-sm.webp','In the classroom','داخل الصف','In the classroom — WadiTech Academy','داخل الصف — أكاديمية وادي تك','classroom',1440,1440,true,'granted',true),
+('image','/media/photos/projects-12.webp','/media/photos/projects-12-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1600,1200,true,'granted',true),
+('image','/media/photos/projects-14.webp','/media/photos/projects-14-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1600,1200,true,'granted',true),
+('image','/media/photos/projects-16.webp','/media/photos/projects-16-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1600,1200,true,'granted',true),
+('image','/media/photos/projects-18.webp','/media/photos/projects-18-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',739,1277,true,'granted',true),
+('image','/media/photos/projects-20.webp','/media/photos/projects-20-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1280,720,true,'granted',true),
+('image','/media/photos/projects-34.webp','/media/photos/projects-34-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1200,1600,true,'granted',true),
+('image','/media/photos/projects-36.webp','/media/photos/projects-36-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1200,1600,true,'granted',true),
+('image','/media/photos/projects-42.webp','/media/photos/projects-42-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1200,1600,true,'granted',true),
+('image','/media/photos/projects-44.webp','/media/photos/projects-44-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1200,1600,true,'granted',true),
+('image','/media/photos/projects-45.webp','/media/photos/projects-45-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',960,1280,true,'granted',true),
+('image','/media/photos/projects-51.webp','/media/photos/projects-51-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1600,721,true,'granted',true),
+('image','/media/photos/projects-64.webp','/media/photos/projects-64-sm.webp','Student project','مشروع طلابي','Student project — WadiTech Academy','مشروع طلابي — أكاديمية وادي تك','projects',1600,1200,true,'granted',true),
+('image','/media/brand/lab-classroom.webp',null,'WadiTech lab','مختبر وادي تك','WadiTech lab — WadiTech Academy','مختبر وادي تك — أكاديمية وادي تك','labs',1672,941,false,'not_required',true),
+('image','/media/brand/lab-entrance.webp',null,'WadiTech lab','مختبر وادي تك','WadiTech lab — WadiTech Academy','مختبر وادي تك — أكاديمية وادي تك','labs',1672,941,false,'not_required',true),
+('video','/media/videos/clip-1.mp4','/media/videos/clip-1.jpg','Learning in action','التعلم أثناء العمل','Students building and testing projects','طلاب يبنون مشاريعهم ويختبرونها','classroom',null,null,true,'granted',true),
+('video','/media/videos/clip-2.mp4','/media/videos/clip-2.jpg','Learning in action','التعلم أثناء العمل','Students building and testing projects','طلاب يبنون مشاريعهم ويختبرونها','competition',null,null,true,'granted',true),
+('video','/media/videos/clip-3.mp4','/media/videos/clip-3.jpg','Learning in action','التعلم أثناء العمل','Students building and testing projects','طلاب يبنون مشاريعهم ويختبرونها','competition',null,null,true,'granted',true),
+('video','/media/videos/clip-4.mp4','/media/videos/clip-4.jpg','Learning in action','التعلم أثناء العمل','Students building and testing projects','طلاب يبنون مشاريعهم ويختبرونها','classroom',null,null,true,'granted',true),
+('video','/media/videos/clip-5.mp4','/media/videos/clip-5.jpg','Learning in action','التعلم أثناء العمل','Students building and testing projects','طلاب يبنون مشاريعهم ويختبرونها','classroom',null,null,true,'granted',true),
+('video','/media/videos/clip-6.mp4','/media/videos/clip-6.jpg','Learning in action','التعلم أثناء العمل','Students building and testing projects','طلاب يبنون مشاريعهم ويختبرونها','classroom',null,null,true,'granted',true),
+('video','/media/videos/clip-7.mp4','/media/videos/clip-7.jpg','Learning in action','التعلم أثناء العمل','Students building and testing projects','طلاب يبنون مشاريعهم ويختبرونها','classroom',null,null,true,'granted',true),
+('video','/media/videos/clip-8.mp4','/media/videos/clip-8.jpg','Learning in action','التعلم أثناء العمل','Students building and testing projects','طلاب يبنون مشاريعهم ويختبرونها','classroom',null,null,true,'granted',true);
+update public.media_assets set featured = true where url in ('/media/photos/competition-29.webp','/media/photos/projects-42.webp','/media/photos/classroom-58.webp','/media/photos/competition-46.webp');
+
