@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { env } from "@/lib/env";
 
+export const dynamic = "force-dynamic";
+
 export default function robots(): MetadataRoute.Robots {
   const base = env().NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   // Until an approved production launch, every non-production environment asks crawlers to stay out.

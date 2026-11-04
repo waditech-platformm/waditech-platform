@@ -4,7 +4,8 @@ import { env } from "@/lib/env";
 import { locales } from "@/lib/i18n/config";
 
 // Public, published content only. Uses the anonymous key, so RLS guarantees nothing private is listed.
-export const revalidate = 3600;
+// Rendered per request (not at build time) so builds never depend on database access.
+export const dynamic = "force-dynamic";
 
 const STATIC = ["", "programs", "labs", "news", "events", "competitions", "scholarships", "schools", "projects", "gallery", "about", "contact", "verify"];
 
