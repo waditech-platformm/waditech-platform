@@ -18,6 +18,12 @@
 7. Vercel environment variables (see `.env.example`): `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server only), `APP_ENV=staging`, `PAYMENTS_PROVIDER=sandbox` or `hyperpay` with **test** credentials, `HYPERPAY_LIVE_ENABLED=false`, `AI_PROVIDER=local`, `STORAGE_DRIVER=supabase`.
 8. Run the Playwright suite against staging with a dedicated test inbox (`E2E_BASE_URL`), or the manual checklist in `TEST_PLAN.md`.
 
+### Email notifications
+- Set `EMAIL_PROVIDER` (`resend` with `RESEND_API_KEY`, or `smtp` with `SMTP_URL`), `EMAIL_FROM` on a verified sending domain, and `CRON_SECRET`.
+- Schedule the worker every few minutes. Vercel Hobby crons run at most daily, so staging uses Supabase pg_cron + pg_net:
+  `select cron.schedule('waditech-email-worker', '*/5 * * * *', $$select net.http_post(url := 'https://<site>/api/cron/notifications', headers := jsonb_build_object('Authorization', 'Bearer <CRON_SECRET>'))$$);`
+- With `EMAIL_PROVIDER=none` the worker sends nothing and emails stay queued (no attempts are consumed).
+
 ## 2. Production (🔒 approval for each item)
 - 🔒 Create `waditech-prod`; apply the same migrations; **no seed**.
 - 🔒 HyperPay live: merchant entity IDs + access token, `HYPERPAY_BASE_URL=https://eu-prod.oppwa.com`, `HYPERPAY_LIVE_ENABLED=true`, webhook URL `https://<domain>/api/payments/hyperpay/webhook` + key. Run a live 1-JOD test and refund.

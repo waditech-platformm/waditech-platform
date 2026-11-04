@@ -34,7 +34,12 @@ Run order (CI does the same): `npm run stack:start` → `npm run db:reset` → `
 | 20 | Payment sandbox workflow | `03-learning` › sandbox checkout activates only after verified payment |
 | + | Password recovery, login rate limiting, contact → inbox, media upload + consent + magic-byte rejection, AI assistant guardrails and quota logging, school tenant isolation | `02-auth`, `05-admin-cms`, `04-portals` |
 
-## Latest results (local, 2026-11-04, clean database reset before the run)
+## Latest results (local, 2026-11-05, clean database reset before the run)
+- Vitest: **59 / 59 passed** (34 unit, 25 database authorization incl. email queue + analytics permissions)
+- Playwright: **43 / 43 passed** (adds CSP header/nonce + no-violation checks, cron-secret protection, end-to-end email delivery through the queue to the captured inbox, admin analytics in EN/AR and access denial)
+- Lighthouse (local production build, mobile simulation; varies by about 10 points between runs on this machine): Accessibility 98-100, Best Practices 100, SEO 69 only because staging is intentionally noindex (the single failing audit is `is-crawlable`), Performance 75-99 (programs 99, news 95, home 85). Re-measure on Vercel's CDN.
+
+## Previous results (2026-11-04)
 - `tsc --noEmit`: **pass** · `eslint`: **0 errors** (4 unused-variable warnings) · `next build`: **pass** (66 pages + 8 route handlers)
 - Vitest: **53 / 53 passed** (31 unit, 22 database authorization)
 - Playwright: **38 / 38 passed** (public 5, auth 5, learning 5, portals 6, admin CMS 4, accessibility 13)

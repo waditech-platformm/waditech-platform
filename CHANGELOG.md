@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 — 2026-11-05 (staging)
+### Added
+- Email delivery for every in-app notification: provider adapter (`none` / `smtp` / `resend`), bilingual templates (preferred language first, links restricted to the platform), worker `/api/cron/notifications` protected by `CRON_SECRET`, retries with exponential backoff up to 5 attempts (migration `0009`).
+- Admin → Analytics: weekly enrollments and sign-ups, monthly paid orders, course completion and certificates, quiz pass rate, email delivery status. Server-rendered accessible SVG charts with a screen-reader table.
+- Nonce-based Content-Security-Policy on every page (fresh nonce per request; scripts only from this origin; Supabase and HyperPay explicitly allowed).
+### Changed
+- Video posters converted to WebP (about 45% smaller); descriptive link text on the homepage; blank environment variables are treated as unset.
+### Deployed
+- Staging on Vercel (`waditech-platform-jrrq.vercel.app`) with a new isolated Supabase project (`waditech-staging`).
+
 ## 0.1.0 — 2026-11-04 (development build, not released)
 ### Added
 - New, isolated Next.js 16 + Supabase repository for WadiTech Academy, English/Arabic with full RTL.

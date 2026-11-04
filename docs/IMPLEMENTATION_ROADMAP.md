@@ -30,13 +30,16 @@ Status values: **Not Started · In Progress · Implemented · Tested · Blocked 
 | | AI assistant (provider abstraction, local free provider, guardrails, quotas, cost log) | Tested | paid providers: **Pending Approval** |
 | 9 Commerce & engagement | Orders, sandbox payments, discounts, receipts, refunds (record) | Tested (sandbox payment) | discounts/refunds: Implemented |
 | | HyperPay adapter (test endpoint, webhook decryption) | Implemented | **Blocked** on merchant test credentials; live billing **Pending Approval** |
-| | In-app notifications, announcements | Implemented | email delivery adapter: Not Started |
+| | In-app notifications, announcements | Tested | |
+| | Email delivery (queue, retries, SMTP/Resend adapters, bilingual templates) | Tested | sends nothing on staging until an email provider account is configured — **Pending Approval** |
 | | Competitions team registration, scholarship applications + review | Implemented | |
 | 10 Hardening | Security review of RLS (found and fixed a trainer over-access issue) | Tested | migration `0008_trainer_scope` |
 | | Accessibility (axe WCAG 2.1 AA on 13 key pages) | Tested | contrast + accessible-name fixes applied; manual screen-reader review: Not Started |
 | | Responsive (360 px overflow checks) | Tested | full visual review at 768/1024 recommended |
-| | Performance (Lighthouse/Core Web Vitals) | Not Started | images are pre-sized WebP with `next/image`; measure on staging |
-| | Content-Security-Policy, MFA for staff, CAPTCHA | Not Started | see `SECURITY_MODEL.md` |
+| | Performance (Lighthouse/Core Web Vitals) | In Progress | local audit done (see TEST_PLAN); posters to WebP; re-measure on Vercel |
+| | Admin analytics | Tested | |
+| | Content-Security-Policy (nonce-based) | Tested | |
+| | MFA for staff, CAPTCHA | Not Started | see `SECURITY_MODEL.md` |
 | | Video hosting/streaming service for lesson videos | Not Started | MP4 files today; choose Mux / Bunny / Cloudflare Stream |
-| Release | Staging deployment on a new isolated Supabase project + Vercel | Pending Approval | `DEPLOYMENT.md` |
+| Release | Staging deployment on a new isolated Supabase project + Vercel | Implemented | https://waditech-platform-jrrq.vercel.app |
 | | Migration from the existing waditech.co Supabase project | Pending Approval | plan in `DEPLOYMENT.md`; nothing has been migrated |
