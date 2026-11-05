@@ -11,22 +11,25 @@ export function SectionHeading({ eyebrow, title, subtitle, action, className, on
   eyebrow?: string; title: string; subtitle?: string; action?: React.ReactNode; className?: string; onDark?: boolean;
 }) {
   return (
-    <div className={cn("mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}>
+    <div className={cn("mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="max-w-2xl">
-        {eyebrow && <p className={cn("mb-2 text-xs font-bold uppercase tracking-[0.18em]", onDark ? "text-cyan-300" : "text-royal-600")}>{eyebrow}</p>}
-        <h2 className={cn("text-2xl font-extrabold tracking-tight sm:text-3xl", onDark ? "text-white" : "text-navy-900")}>{title}</h2>
-        {subtitle && <p className={cn("mt-2 text-base", onDark ? "text-white/75" : "text-muted")}>{subtitle}</p>}
+        {eyebrow && <p className={cn("mb-2 text-sm font-semibold", onDark ? "text-cyan-300" : "text-royal-600")}>{eyebrow}</p>}
+        <h2 className={cn("text-3xl font-extrabold tracking-tight sm:text-4xl", onDark ? "text-white" : "text-navy-900")}>{title}</h2>
+        {subtitle && <p className={cn("mt-3 text-lg", onDark ? "text-white/75" : "text-muted")}>{subtitle}</p>}
       </div>
       {action}
     </div>
   );
 }
-export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: React.ReactNode }) {
+/** Page header for public pages: light, calm, large type (matches the homepage hero). */
+export function PageHeader({ title, subtitle, eyebrow, children }: { title: string; subtitle?: string; eyebrow?: string; children?: React.ReactNode }) {
   return (
-    <div className="bg-neural text-white">
-      <Container className="py-12 sm:py-16">
-        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
-        {subtitle && <p className="mt-3 max-w-2xl text-white/80">{subtitle}</p>}
+    <div className="relative overflow-hidden border-b border-line bg-white">
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_80%_at_85%_0%,rgb(32_201_207/0.10),transparent_70%),radial-gradient(45%_70%_at_5%_0%,rgb(36_86_211/0.07),transparent_70%)]" />
+      <Container className="relative py-12 sm:py-16 lg:py-20">
+        {eyebrow && <p className="wt-rise mb-3 text-sm font-semibold text-royal-600">{eyebrow}</p>}
+        <h1 className="wt-rise max-w-4xl text-4xl font-extrabold leading-[1.1] tracking-tight text-navy-900 sm:text-5xl" style={{ "--i": 1 } as React.CSSProperties}>{title}</h1>
+        {subtitle && <p className="wt-rise mt-4 max-w-2xl text-lg leading-relaxed text-muted" style={{ "--i": 2 } as React.CSSProperties}>{subtitle}</p>}
         {children}
       </Container>
     </div>

@@ -1,235 +1,268 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Bot, Cpu, GraduationCap, Hammer, Languages, School, Trophy, Award } from "lucide-react";
-import { isLocale, pick, formatDate, type Locale } from "@/lib/i18n/config";
+import { ArrowRight, Check, Hammer, Lightbulb, School, Trophy, Users } from "lucide-react";
+import { isLocale, pick, type Locale } from "@/lib/i18n/config";
 import { getDict } from "@/lib/i18n/dictionary";
-import { Container, SectionHeading, Card, Badge, DemoBadge } from "@/components/ui/primitives";
+import { Container } from "@/components/ui/primitives";
 import { ButtonLink } from "@/components/ui/button";
-import { CourseCard, NewsCard, EventCard, LabCard } from "@/components/cards";
+import { NewsCard, EventCard, LabCard, priceLabel } from "@/components/cards";
 import { VideoTile } from "@/components/video-tile";
-import { featuredCourses } from "@/features/catalog/queries";
-import { listCompetitions, listEvents, listLabs, listMedia, listNews, listScholarships, publicProjects } from "@/features/content/queries";
+import { listCourses } from "@/features/catalog/queries";
+import { listCompetitions, listEvents, listLabs, listMedia, listNews, publicProjects } from "@/features/content/queries";
+import { ProgramFinder, type FinderCourse } from "@/features/home/program-finder";
+import { AGE_BANDS } from "@/features/home/age-bands";
+import { LabFigure } from "@/features/home/lab-figure";
 
-export default async function Home({ params }: PageProps<"/[locale]">) {
+/** Section heading used across the homepage: calm, large type, one optional link. */
+function Heading({ title, subtitle, href, linkLabel, id }: { title: string; subtitle?: string; href?: string; linkLabel?: string; id?: string }) {
+  return (
+    <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="max-w-2xl">
+        <h2 id={id} className="text-3xl font-extrabold tracking-tight text-navy-900 sm:text-4xl">{title}</h2>
+        {subtitle && <p className="mt-3 text-lg text-muted">{subtitle}</p>}
+      </div>
+      {href && linkLabel && (
+        <Link href={href} className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-royal-600 underline-offset-4 hover:underline">
+          {linkLabel}<ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export default async function Home({ params, searchParams }: PageProps<"/[locale]">) {
   const { locale: l } = await params;
+  const sp = await searchParams;
   const locale: Locale = isLocale(l) ? l : "en";
   const d = getDict(locale);
+  const h = d.home;
   const p = (s: string) => `/${locale}${s}`;
-  const [courses, labs, events, news, comps, schols, projects, videos, photos] = await Promise.all([
-    featuredCourses(6), listLabs(), listEvents("upcoming", 3), listNews({ limit: 3 }), listCompetitions(2), listScholarships(2),
-    publicProjects(4), listMedia({ kind: "video", limit: 4 }), listMedia({ kind: "image", featured: true, limit: 4 }),
+  const [courses, labs, events, news, comps, projects, videos, photos] = await Promise.all([
+    listCourses(), listLabs(), listEvents("upcoming", 3), listNews({ limit: 3 }), listCompetitions(8),
+    publicProjects(4), listMedia({ kind: "video", limit: 6 }), listMedia({ kind: "image", limit: 12 }),
   ]);
+
+  const cats = d.enums.category as Record<string, string>;
+  const finderCourses: FinderCourse[] = courses.map((c) => ({
+    id: c.id, slug: c.slug, title: pick(c, "title", locale), category: c.category, categoryLabel: cats[c.category] ?? c.category,
+    age_min: c.age_min, age_max: c.age_max, price: priceLabel(c, locale, d), thumb: c.thumbnail_url ?? c.cover_url ?? null,
+  }));
+  const tracks = [...new Set(courses.map((c) => c.category))].map((k) => ({ key: k, label: cats[k] ?? k }));
+  const q = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
+  const initialAge = AGE_BANDS.some((b) => b.key === q(sp.age)) ? q(sp.age) : undefined;
+  const initialTrack = tracks.some((t) => t.key === q(sp.track)) ? q(sp.track) : undefined;
+
   const arrow = <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />;
-  const why = [
-    { icon: Hammer, t: d.home.why1Title, b: d.home.why1Body },
-    { icon: Cpu, t: d.home.why2Title, b: d.home.why2Body },
-    { icon: GraduationCap, t: d.home.why3Title, b: d.home.why3Body },
-    { icon: Languages, t: d.home.why4Title, b: d.home.why4Body },
+  const journey = [
+    { icon: Lightbulb, t: h.journey1Title, b: h.journey1Body, img: photos[0] },
+    { icon: Hammer, t: h.journey2Title, b: h.journey2Body, img: photos[1] },
+    { icon: Trophy, t: h.journey3Title, b: h.journey3Body, img: photos[2] },
   ];
+  const bento = photos.slice(3, 8);
+  const parentPhoto = photos[8];
+  const labAlt = locale === "ar" ? "مدخل مختبر الروبوتات للأطفال في وادي تك" : "Entrance of the WadiTech kids robotics lab";
 
   return (
     <>
-      {/* ---------- HERO ---------- */}
-      <section className="bg-neural relative overflow-hidden text-white">
-        <Container className="grid items-center gap-10 py-14 sm:py-20 lg:grid-cols-[1.05fr_1fr] lg:py-24">
+      {/* ---------- HERO: large calm type + program finder ---------- */}
+      <section className="relative overflow-hidden bg-white">
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(60%_60%_at_80%_0%,rgb(32_201_207/0.12),transparent_70%),radial-gradient(50%_50%_at_10%_10%,rgb(36_86_211/0.08),transparent_70%)]" />
+        <Container className="relative grid grid-cols-1 items-center gap-12 py-14 sm:py-20 [&>*]:min-w-0 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:py-24">
           <div>
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-cyan-300 ring-1 ring-white/15">
-              <Bot className="size-3.5" aria-hidden />{d.home.heroEyebrow}
-            </p>
-            <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">{d.home.heroTitle}</h1>
-            <p className="mt-4 text-xl font-bold text-cyan-300 sm:text-2xl">{d.home.heroSubtitle}</p>
-            <p className="mt-4 max-w-xl text-base text-white/80 sm:text-lg">{d.home.heroBody}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <ButtonLink href={p("/programs")} variant="accent" size="lg">{d.home.ctaExplore}{arrow}</ButtonLink>
-              <ButtonLink href={p("/about")} variant="onDark" size="lg">{d.home.ctaDiscover}</ButtonLink>
+            <p className="wt-rise text-sm font-semibold text-royal-600" style={{ "--i": 0 } as React.CSSProperties}>{h.heroEyebrow}</p>
+            <h1 className="wt-rise mt-4 text-4xl font-extrabold leading-[1.08] tracking-tight text-navy-900 sm:text-5xl lg:text-6xl" style={{ "--i": 1 } as React.CSSProperties}>{h.heroTitle}</h1>
+            <p className="wt-rise mt-5 flex flex-wrap gap-x-3 text-xl font-bold text-cyan-600 sm:text-2xl" style={{ "--i": 2 } as React.CSSProperties}>{h.heroSubtitle}</p>
+            <p className="wt-rise mt-5 max-w-xl text-lg leading-relaxed text-muted" style={{ "--i": 3 } as React.CSSProperties}>{h.heroBody}</p>
+            <div className="wt-rise mt-8 flex flex-wrap gap-3" style={{ "--i": 4 } as React.CSSProperties}>
+              <ButtonLink href={p("/programs")} size="lg">{h.ctaExplore}{arrow}</ButtonLink>
+              <ButtonLink href={p("/about")} variant="secondary" size="lg">{h.ctaDiscover}</ButtonLink>
             </div>
           </div>
-          <div className="relative">
-            <div className="relative aspect-[16/10] overflow-hidden rounded-3xl shadow-2xl ring-1 ring-white/15">
-              <Image src="/media/brand/lab-entrance.webp" alt={locale === "ar" ? "مدخل مختبر الروبوتات للأطفال في وادي تك" : "Entrance of the WadiTech kids robotics lab"} fill priority sizes="(min-width:1024px) 50vw, 100vw" className="object-cover" />
-            </div>
-            <div className="absolute -bottom-6 start-4 w-36 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-cyan-500/40 sm:-bottom-8 sm:w-48 lg:-start-8">
-              <Image src="/media/brand/logo-original.png" alt={d.meta.fullName} width={384} height={384} className="h-auto w-full" />
-            </div>
+          <div className="wt-rise" style={{ "--i": 3 } as React.CSSProperties}>
+            <ProgramFinder locale={locale} courses={finderCourses} tracks={tracks} initialAge={initialAge} initialTrack={initialTrack}
+              labels={{ title: h.finderTitle, age: h.finderAge, track: h.finderTrack, all: h.finderAll, m0: h.matches0, m1: h.matches1, m2: h.matches2, mN: h.matchesN, seeMatching: h.seeMatching,
+                ages: { "6-9": h.age69, "10-13": h.age1013, "14-18": h.age1418 } }} />
           </div>
         </Container>
       </section>
 
-      {/* ---------- FEATURED PROGRAMS ---------- */}
-      <section className="py-16 sm:py-20">
+      {/* ---------- THE LAB (annotated supplied image) ---------- */}
+      <section className="bg-white pb-16 sm:pb-24">
         <Container>
-          <SectionHeading eyebrow={d.nav.programs} title={d.home.featuredTitle} subtitle={d.home.featuredSubtitle} action={<ButtonLink href={p("/programs")} variant="secondary">{d.common.viewAll}{arrow}</ButtonLink>} />
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{courses.map((c) => <CourseCard key={c.id} c={c} locale={locale} d={d} />)}</div>
+          <LabFigure alt={labAlt} labels={[h.callout1, h.callout2, h.callout3, h.callout4]} caption={h.labCaption} logoAlt={d.meta.fullName} />
         </Container>
       </section>
 
-      {/* ---------- LEARNING IN ACTION ---------- */}
-      <section className="bg-white py-16 sm:py-20">
-        <Container>
-          <SectionHeading title={d.home.actionTitle} subtitle={d.home.actionSubtitle} action={<ButtonLink href={p("/gallery")} variant="secondary">{d.nav.gallery}{arrow}</ButtonLink>} />
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-            {videos.map((v) => (
-              <div key={v.id} className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-navy-900">
-                <VideoTile src={v.url} poster={v.poster_url} label={pick(v, "alt", locale)} className="absolute inset-0 size-full object-cover" />
-              </div>
-            ))}
-            {photos.slice(0, Math.max(0, 4 - videos.length)).map((m) => (
-              <div key={m.id} className="relative aspect-[3/4] overflow-hidden rounded-2xl"><Image src={m.url} alt={pick(m, "alt", locale)} fill sizes="25vw" className="object-cover" /></div>
-            ))}
-          </div>
-        </Container>
-      </section>
-
-      {/* ---------- WHY + LAB SPACE (user-supplied classroom image) ---------- */}
-      <section className="py-16 sm:py-20">
-        <Container className="grid items-center gap-10 lg:grid-cols-2">
-          <div className="relative aspect-[16/10] overflow-hidden rounded-3xl shadow-[var(--shadow-lift)]">
-            <Image src="/media/brand/lab-classroom.webp" alt={locale === "ar" ? "محطات البرمجة والروبوتات داخل مختبر وادي تك" : "Coding and robotics workstations inside the WadiTech lab"} fill sizes="(min-width:1024px) 50vw, 100vw" className="object-cover" />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-navy-950/90 to-transparent p-6 text-white">
-              <p className="text-lg font-bold">{d.home.labSpaceTitle}</p>
-              <p className="mt-1 max-w-md text-sm text-white/80">{d.home.labSpaceBody}</p>
-            </div>
-          </div>
-          <div>
-            <SectionHeading eyebrow={d.meta.siteName} title={d.home.whyTitle} subtitle={d.home.whySubtitle} className="mb-6" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              {why.map((w) => (
-                <Card key={w.t} className="p-5">
-                  <w.icon className="size-6 text-royal-600" aria-hidden />
-                  <p className="mt-3 font-bold text-navy-900">{w.t}</p>
-                  <p className="mt-1 text-sm text-muted">{w.b}</p>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </Container>
-      </section>
-
-      {/* ---------- LABS ---------- */}
-      <section className="bg-neural py-16 text-white sm:py-20">
-        <Container>
-          <SectionHeading onDark eyebrow={d.nav.labs} title={d.home.labsTitle} subtitle={d.home.labsSubtitle} action={<ButtonLink href={p("/labs")} variant="onDark">{d.common.viewAll}{arrow}</ButtonLink>} />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{labs.slice(0, 6).map((x) => <LabCard key={x.id} l={x} locale={locale} d={d} />)}</div>
-        </Container>
-      </section>
-
-      {/* ---------- SCHOOLS ---------- */}
-      <section className="py-16 sm:py-20">
-        <Container>
-          <Card className="grid overflow-hidden lg:grid-cols-2">
-            <div className="p-8 sm:p-10">
-              <School className="size-8 text-royal-600" aria-hidden />
-              <h2 className="mt-4 text-2xl font-extrabold text-navy-900 sm:text-3xl">{d.home.schoolsTitle}</h2>
-              <p className="mt-3 text-muted">{d.home.schoolsBody}</p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <ButtonLink href={p("/contact?topic=schools")}>{d.home.schoolsCta}{arrow}</ButtonLink>
-                <ButtonLink href={p("/schools")} variant="secondary">{d.home.learnAboutSchools}</ButtonLink>
-              </div>
-            </div>
-            <div className="relative min-h-64"><Image src="/media/photos/classroom-41.webp" alt="" fill sizes="(min-width:1024px) 50vw, 100vw" className="object-cover" /></div>
-          </Card>
-        </Container>
-      </section>
-
-      {/* ---------- COMPETITIONS & SCHOLARSHIPS ---------- */}
-      <section className="bg-white py-16 sm:py-20">
-        <Container className="grid gap-10 lg:grid-cols-2">
-          <div>
-            <SectionHeading title={d.home.competitionsTitle} subtitle={d.home.competitionsSubtitle} action={<Link className="text-sm font-semibold text-royal-600" href={p("/competitions")}>{d.common.viewAll}</Link>} />
-            <div className="space-y-4">
+      {/* ---------- TRUST: real competitions only ---------- */}
+      {comps.length > 0 && (
+        <section className="border-y border-line bg-surface py-8">
+          <Container className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
+            <h2 className="shrink-0 text-sm font-semibold text-muted">{h.trustTitle}</h2>
+            <ul className="flex flex-wrap gap-x-8 gap-y-3">
               {comps.map((c) => (
-                <Link key={c.id} href={p(`/competitions/${c.slug}`)} className="flex gap-4 rounded-2xl p-3 ring-1 ring-line transition hover:ring-royal-500">
-                  <div className="relative size-24 shrink-0 overflow-hidden rounded-xl bg-navy-900">{c.cover_url && <Image src={c.cover_url} alt="" fill sizes="96px" className="object-cover" />}</div>
-                  <div className="min-w-0">
-                    <div className="flex gap-1.5"><Badge tone="cyan"><Trophy className="size-3" aria-hidden />{d.competitions.compStatus[c.status as keyof Dict["competitions"]["compStatus"]]}</Badge><DemoBadge show={c.is_test_data} label={d.common.demoBadge} /></div>
-                    <p className="mt-1.5 font-bold text-navy-900">{pick(c, "title", locale)}</p>
-                    {c.registration_deadline && <p className="text-xs text-subtle">{d.competitions.deadline}: {formatDate(c.registration_deadline, locale)}</p>}
-                  </div>
-                </Link>
+                <li key={c.id}><Link href={p(`/competitions/${c.slug}`)} className="inline-flex items-center gap-2 font-semibold text-navy-900 hover:text-royal-600"><Trophy className="size-4 text-cyan-600" aria-hidden />{pick(c, "title", locale)}</Link></li>
               ))}
-            </div>
-          </div>
-          <div>
-            <SectionHeading title={d.home.scholarshipsTitle} subtitle={d.home.scholarshipsSubtitle} action={<Link className="text-sm font-semibold text-royal-600" href={p("/scholarships")}>{d.common.viewAll}</Link>} />
-            <div className="space-y-4">
-              {schols.map((s) => (
-                <Link key={s.id} href={p(`/scholarships/${s.slug}`)} className="block rounded-2xl bg-gradient-to-br from-royal-600 to-navy-800 p-6 text-white transition hover:shadow-[var(--shadow-lift)]">
-                  <div className="flex items-center gap-2"><Award className="size-5 text-cyan-300" aria-hidden /><DemoBadge show={s.is_test_data} label={d.common.demoBadge} /></div>
-                  <p className="mt-3 text-lg font-bold">{pick(s, "title", locale)}</p>
-                  <p className="mt-1 text-sm text-white/80">{pick(s, "description", locale)}</p>
-                  {s.coverage_percent && <p className="mt-3 text-sm font-semibold text-cyan-300">{d.scholarships.coverage}: {s.coverage_percent}%</p>}
-                </Link>
-              ))}
-            </div>
-          </div>
+            </ul>
+          </Container>
+        </section>
+      )}
+
+      {/* ---------- LEARNING JOURNEY ---------- */}
+      <section className="py-16 sm:py-24">
+        <Container>
+          <Heading title={h.journeyTitle} subtitle={h.journeySubtitle} />
+          <ol className="grid gap-6 md:grid-cols-3">
+            {journey.map((j, i) => (
+              <li key={j.t} className="overflow-hidden rounded-[24px] bg-white ring-1 ring-line">
+                <div className="relative aspect-[4/3] bg-navy-900">
+                  {j.img && <Image src={j.img.url} alt={pick(j.img, "alt", locale)} fill sizes="(min-width:768px) 33vw, 100vw" className="object-cover" />}
+                </div>
+                <div className="p-6">
+                  <p className="flex items-center gap-3 text-sm font-semibold text-royal-600">
+                    <span className="grid size-8 place-items-center rounded-full bg-royal-50 font-latin">{i + 1}</span><j.icon className="size-4" aria-hidden />
+                  </p>
+                  <h3 className="mt-3 text-xl font-bold text-navy-900">{j.t}</h3>
+                  <p className="mt-2 text-muted">{j.b}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </Container>
       </section>
 
-      {/* ---------- NEWS + EVENTS ---------- */}
-      <section className="py-16 sm:py-20">
-        <Container className="grid gap-10 lg:grid-cols-[2fr_1fr]">
-          <div>
-            <SectionHeading title={d.home.newsTitle} action={<Link className="text-sm font-semibold text-royal-600" href={p("/news")}>{d.common.viewAll}</Link>} />
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{news.map((a) => <NewsCard key={a.id} a={a} locale={locale} d={d} />)}</div>
-          </div>
-          <div>
-            <SectionHeading title={d.home.eventsTitle} action={<Link className="text-sm font-semibold text-royal-600" href={p("/events")}>{d.common.viewAll}</Link>} />
-            <div className="space-y-3">{events.length ? events.map((e) => <EventCard key={e.id} e={e} locale={locale} d={d} />) : <p className="text-sm text-muted">{d.events.empty}</p>}</div>
-          </div>
-        </Container>
-      </section>
+      {/* ---------- ARENA: filmstrip + bento of consented media ---------- */}
+      {(videos.length > 0 || bento.length > 0) && (
+        <section className="bg-navy-950 py-16 text-white sm:py-24">
+          <Container>
+            <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{h.arenaTitle}</h2>
+                <p className="mt-3 text-lg text-white/75">{h.arenaSubtitle}</p>
+              </div>
+              <Link href={p("/gallery")} className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-cyan-300 underline-offset-4 hover:underline">{d.nav.gallery}{arrow}</Link>
+            </div>
+            {videos.length > 0 && (
+              <ul tabIndex={0} className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:mx-0 sm:px-0" aria-label={h.arenaTitle}>
+                {videos.map((v) => (
+                  <li key={v.id} className="relative aspect-[9/16] w-52 shrink-0 snap-start overflow-hidden rounded-2xl bg-navy-900 sm:w-60">
+                    <VideoTile src={v.url} poster={v.poster_url} label={pick(v, "alt", locale)} className="absolute inset-0 size-full object-cover" />
+                  </li>
+                ))}
+              </ul>
+            )}
+            {bento.length > 0 && (
+              <div className="mt-6 grid auto-rows-[160px] grid-cols-2 gap-4 sm:auto-rows-[200px] md:grid-cols-4">
+                {bento.map((m, i) => (
+                  <div key={m.id} className={`relative overflow-hidden rounded-2xl ${i === 0 ? "col-span-2 row-span-2" : ""}`}>
+                    <Image src={m.url} alt={pick(m, "alt", locale)} fill sizes={i === 0 ? "(min-width:768px) 50vw, 100vw" : "(min-width:768px) 25vw, 50vw"} className="object-cover" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Container>
+        </section>
+      )}
 
       {/* ---------- STUDENT PROJECTS ---------- */}
       {projects.length > 0 && (
-        <section className="bg-white py-16 sm:py-20">
+        <section className="py-16 sm:py-24">
           <Container>
-            <SectionHeading title={d.home.projectsTitle} subtitle={d.home.projectsSubtitle} action={<Link className="text-sm font-semibold text-royal-600" href={p("/projects")}>{d.common.viewAll}</Link>} />
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <Heading title={h.projectsTitle} subtitle={h.projectsSubtitle} href={p("/projects")} linkLabel={d.common.viewAll} />
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {projects.map((pr) => (
-                <Card key={pr.id} className="overflow-hidden">
-                  <div className="relative aspect-[4/3] bg-navy-900">{pr.cover_url && <Image src={pr.cover_url} alt="" fill sizes="25vw" className="object-cover" />}</div>
-                  <div className="p-4">
-                    <DemoBadge show={pr.is_test_data} label={d.common.demoBadge} />
-                    <p className="mt-1 font-bold text-navy-900">{pr.title}</p>
-                    <p className="text-xs text-subtle">{d.projects.by} {pr.student_first_name}</p>
+                <article key={pr.id} className="overflow-hidden rounded-[24px] bg-white ring-1 ring-line">
+                  <div className="relative aspect-[4/3] bg-navy-900">{pr.cover_url && <Image src={pr.cover_url} alt="" fill sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" />}</div>
+                  <div className="p-5">
+                    <h3 className="font-bold text-navy-900">{pr.title}</h3>
+                    <p className="mt-1 text-sm text-subtle">{d.projects.by} {pr.student_first_name}</p>
                   </div>
-                </Card>
+                </article>
               ))}
             </div>
           </Container>
         </section>
       )}
 
-      {/* ---------- GALLERY STRIP ---------- */}
-      <section className="py-16 sm:py-20">
-        <Container>
-          <SectionHeading title={d.home.galleryTitle} action={<ButtonLink href={p("/gallery")} variant="secondary">{d.common.viewAll}{arrow}</ButtonLink>} />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {photos.map((m, i) => (
-              <div key={m.id} className={`relative overflow-hidden rounded-2xl ${i === 0 ? "col-span-2 row-span-2 aspect-square sm:aspect-auto" : "aspect-square"}`}>
-                <Image src={m.url} alt={pick(m, "alt", locale)} fill sizes={i === 0 ? "50vw" : "25vw"} className="object-cover" />
+      {/* ---------- PARENTS + SCHOOLS ---------- */}
+      <section className="bg-white py-16 sm:py-24">
+        <Container className="grid grid-cols-1 gap-6 [&>*]:min-w-0 lg:grid-cols-2">
+          <div className="flex flex-col overflow-hidden rounded-[28px] bg-surface ring-1 ring-line">
+            {parentPhoto && (
+              <div className="relative aspect-[16/9]"><Image src={parentPhoto.url} alt={pick(parentPhoto, "alt", locale)} fill sizes="(min-width:1024px) 50vw, 100vw" className="object-cover" /></div>
+            )}
+            <div className="flex-1 p-8 sm:p-10">
+            <Users className="size-8 text-royal-600" aria-hidden />
+            <h2 className="mt-5 text-2xl font-extrabold text-navy-900 sm:text-3xl">{h.parentsTitle}</h2>
+            <p className="mt-3 text-muted">{h.parentsBody}</p>
+            <ul className="mt-6 space-y-3">
+              {[h.parents1, h.parents2, h.parents3, h.parents4].map((x) => (
+                <li key={x} className="flex gap-3 text-navy-900"><Check className="mt-0.5 size-5 shrink-0 text-cyan-600" aria-hidden />{x}</li>
+              ))}
+            </ul>
+            <div className="mt-8"><ButtonLink href={p("/register")}>{h.parentsCta}{arrow}</ButtonLink></div>
+          </div>
+          </div>
+          <div className="flex flex-col overflow-hidden rounded-[28px] bg-navy-900 text-white">
+            <div className="relative aspect-[16/9]">
+              <Image src="/media/brand/lab-classroom.webp" alt={locale === "ar" ? "محطات البرمجة والروبوتات داخل مختبر وادي تك" : "Coding and robotics workstations inside the WadiTech lab"} fill sizes="(min-width:1024px) 50vw, 100vw" className="object-cover" />
+            </div>
+            <div className="flex flex-1 flex-col p-8 sm:p-10">
+              <School className="size-8 text-cyan-300" aria-hidden />
+              <h2 className="mt-5 text-2xl font-extrabold sm:text-3xl">{h.schoolsTitle}</h2>
+              <p className="mt-3 text-white/80">{h.schoolsBody}</p>
+              <ul className="mt-6 space-y-3">
+                {h.schoolsPoints.split(" · ").map((x) => (
+                  <li key={x} className="flex gap-3"><Check className="mt-0.5 size-5 shrink-0 text-cyan-300" aria-hidden />{x}</li>
+                ))}
+              </ul>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <ButtonLink href={p("/contact?topic=schools")} variant="accent">{h.schoolsCta}{arrow}</ButtonLink>
+                <ButtonLink href={p("/schools")} variant="onDark">{h.learnAboutSchools}</ButtonLink>
               </div>
-            ))}
+            </div>
           </div>
         </Container>
       </section>
 
-      {/* ---------- PARTNERS / TESTIMONIALS (honest empty states) ---------- */}
-      <section className="bg-white py-14">
-        <Container className="grid gap-6 md:grid-cols-2">
-          <div><h2 className="text-xl font-bold text-navy-900">{d.home.partnersTitle}</h2><p className="mt-2 text-sm text-muted">{d.home.partnersEmpty}</p></div>
-          <div className="text-sm text-muted md:text-end"><p>{d.home.testimonialsNote}</p></div>
+      {/* ---------- LABS ---------- */}
+      {labs.length > 0 && (
+        <section className="bg-neural py-16 text-white sm:py-24">
+          <Container>
+            <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{h.labsTitle}</h2>
+                <p className="mt-3 text-lg text-white/75">{h.labsSubtitle}</p>
+              </div>
+              <Link href={p("/labs")} className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-cyan-300 underline-offset-4 hover:underline">{d.common.viewAll}{arrow}</Link>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{labs.slice(0, 6).map((x) => <LabCard key={x.id} l={x} locale={locale} d={d} />)}</div>
+          </Container>
+        </section>
+      )}
+
+      {/* ---------- NEWS + EVENTS ---------- */}
+      <section className="bg-white py-16 sm:py-24">
+        <Container className="grid grid-cols-1 gap-12 [&>*]:min-w-0 lg:grid-cols-[2fr_1fr]">
+          <div>
+            <Heading title={h.newsTitle} href={p("/news")} linkLabel={d.common.viewAll} />
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{news.map((a) => <NewsCard key={a.id} a={a} locale={locale} d={d} />)}</div>
+          </div>
+          <div>
+            <Heading title={h.eventsTitle} href={p("/events")} linkLabel={d.common.viewAll} />
+            <div className="space-y-3">{events.length ? events.map((e) => <EventCard key={e.id} e={e} locale={locale} d={d} />) : <p className="text-sm text-muted">{d.events.empty}</p>}</div>
+          </div>
         </Container>
       </section>
 
-      {/* ---------- CONTACT CTA ---------- */}
-      <section className="py-16">
+      {/* ---------- FINAL CTA ---------- */}
+      <section className="py-16 sm:py-24">
         <Container>
-          <div className="bg-neural flex flex-col items-start gap-6 rounded-3xl p-8 text-white sm:p-12 md:flex-row md:items-center md:justify-between">
-            <div><h2 className="text-2xl font-extrabold sm:text-3xl">{d.home.contactTitle}</h2><p className="mt-2 text-white/80">{d.home.contactBody}</p></div>
-            <div className="flex flex-wrap gap-3">
-              <ButtonLink href={p("/contact")} variant="accent" size="lg">{d.nav.contact}</ButtonLink>
-              <ButtonLink href={p("/register")} variant="onDark" size="lg">{d.nav.register}</ButtonLink>
+          <div className="bg-neural relative overflow-hidden rounded-[32px] px-8 py-14 text-center text-white sm:px-14 sm:py-20">
+            <h2 className="mx-auto max-w-3xl text-3xl font-extrabold tracking-tight sm:text-5xl">{h.finalTitle}</h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-white/80">{h.finalBody}</p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <ButtonLink href={p("/programs")} variant="accent" size="lg">{h.ctaExplore}{arrow}</ButtonLink>
+              <ButtonLink href={p("/contact")} variant="onDark" size="lg">{d.nav.contact}</ButtonLink>
             </div>
           </div>
         </Container>
@@ -237,4 +270,3 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
     </>
   );
 }
-type Dict = ReturnType<typeof getDict>;

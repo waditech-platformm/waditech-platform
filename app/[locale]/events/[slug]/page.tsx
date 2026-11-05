@@ -33,19 +33,19 @@ export default async function EventPage({ params }: PageProps<"/[locale]/events/
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
-      <section className="bg-neural text-white">
-        <Container className="grid gap-8 py-10 lg:grid-cols-[1.2fr_1fr] lg:py-14">
+      <section className="border-b border-line bg-white">
+        <Container className="grid grid-cols-1 items-center gap-10 py-12 [&>*]:min-w-0 lg:grid-cols-[1.2fr_1fr] lg:py-16">
           <div>
-            <Link href={`/${locale}/events`} className="text-sm text-white/70 hover:text-white">← {d.events.title}</Link>
+            <Link href={`/${locale}/events`} className="text-sm text-subtle hover:text-royal-600">← {d.events.title}</Link>
             <div className="mt-4 flex gap-2"><Badge tone={e.status === "cancelled" ? "danger" : "cyan"}>{d.events.status[e.status as keyof typeof d.events.status]}</Badge><DemoBadge show={e.is_test_data} label={d.common.demoBadge} /></div>
-            <h1 className="mt-3 text-3xl font-extrabold sm:text-4xl">{pick(e, "title", locale)}</h1>
-            <dl className="mt-6 space-y-2 text-white/85">
-              <div className="flex items-center gap-2"><CalendarDays className="size-5 text-cyan-300" aria-hidden /><dt className="sr-only">{d.events.when}</dt><dd>{formatDateTime(e.starts_at, locale)}{e.ends_at && ` – ${formatDateTime(e.ends_at, locale)}`}</dd></div>
-              {pick(e, "location", locale) && <div className="flex items-center gap-2"><MapPin className="size-5 text-cyan-300" aria-hidden /><dt className="sr-only">{d.events.location}</dt><dd>{pick(e, "location", locale)}</dd></div>}
-              {e.capacity && <div className="flex items-center gap-2"><Users className="size-5 text-cyan-300" aria-hidden /><dd>{seats.registered} / {e.capacity} {d.events.seats}</dd></div>}
+            <h1 className="mt-4 text-4xl font-extrabold leading-[1.1] tracking-tight text-navy-900 sm:text-5xl">{pick(e, "title", locale)}</h1>
+            <dl className="mt-6 space-y-2 text-navy-900">
+              <div className="flex items-center gap-2"><CalendarDays className="size-5 text-royal-600" aria-hidden /><dt className="sr-only">{d.events.when}</dt><dd>{formatDateTime(e.starts_at, locale)}{e.ends_at && ` – ${formatDateTime(e.ends_at, locale)}`}</dd></div>
+              {pick(e, "location", locale) && <div className="flex items-center gap-2"><MapPin className="size-5 text-royal-600" aria-hidden /><dt className="sr-only">{d.events.location}</dt><dd>{pick(e, "location", locale)}</dd></div>}
+              {e.capacity && <div className="flex items-center gap-2"><Users className="size-5 text-royal-600" aria-hidden /><dd>{seats.registered} / {e.capacity} {d.events.seats}</dd></div>}
             </dl>
           </div>
-          {e.cover_url && <div className="relative aspect-[16/10] overflow-hidden rounded-3xl"><Image src={e.cover_url} alt="" fill priority sizes="(min-width:1024px) 40vw, 100vw" className="object-cover" /></div>}
+          {e.cover_url && <div className="relative aspect-[16/10] overflow-hidden rounded-[28px] ring-1 ring-line"><Image src={e.cover_url} alt="" fill priority sizes="(min-width:1024px) 40vw, 100vw" className="object-cover" /></div>}
         </Container>
       </section>
       <Container className="grid gap-8 py-10 lg:grid-cols-[1fr_340px]">

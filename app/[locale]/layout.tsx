@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import "../globals.css";
 import { dirOf, isLocale, locales, type Locale } from "@/lib/i18n/config";
 import { getDict } from "@/lib/i18n/dictionary";
@@ -10,8 +9,8 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { getViewer } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { breakingNews } from "@/features/content/queries";
+import { AnnouncementBar } from "@/components/layout/announcement-bar";
 import { env } from "@/lib/env";
-import { Megaphone } from "lucide-react";
 
 export const viewport: Viewport = { themeColor: "#101C3D", width: "device-width", initialScale: 1 };
 
@@ -59,12 +58,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             <div className="no-print bg-warning-bg px-4 py-1.5 text-center text-xs font-semibold text-warning" role="note">{dict.common.demoBanner}</div>
           )}
           {breaking && (
-            <div className="no-print bg-royal-600 text-white">
-              <Link href={`/${locale}/news/${breaking.slug}`} className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2 text-sm sm:px-6 lg:px-8">
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide"><Megaphone className="size-3.5" aria-hidden />{dict.home.breaking}</span>
-                <span className="truncate font-medium">{locale === "ar" ? breaking.title_ar : breaking.title_en}</span>
-              </Link>
-            </div>
+            <AnnouncementBar id={breaking.slug} href={`/${locale}/news/${breaking.slug}`} label={dict.home.breaking} title={locale === "ar" ? breaking.title_ar : breaking.title_en} dismissLabel={dict.home.dismiss} />
           )}
           <div className="no-print"><SiteHeader locale={locale} dict={dict} viewer={viewer} unread={unread} /></div>
           <main id="main">{children}</main>

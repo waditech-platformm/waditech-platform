@@ -84,14 +84,14 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
-      <section className="bg-neural text-white">
-        <Container className="grid gap-8 py-10 lg:grid-cols-[1.3fr_1fr] lg:py-14">
+      <section className="border-b border-line bg-white">
+        <Container className="grid grid-cols-1 items-center gap-10 py-12 [&>*]:min-w-0 lg:grid-cols-[1.3fr_1fr] lg:py-16">
           <div>
-            <nav aria-label="Breadcrumb" className="text-sm text-white/60"><Link href={p("/programs")} className="hover:text-white">{d.nav.programs}</Link> / <span className="text-white/90">{d.enums.category[c.category as keyof typeof d.enums.category]}</span></nav>
+            <nav aria-label="Breadcrumb" className="text-sm text-subtle"><Link href={p("/programs")} className="hover:text-royal-600">{d.nav.programs}</Link> / <span className="text-navy-900">{d.enums.category[c.category as keyof typeof d.enums.category]}</span></nav>
             <div className="mt-4 flex flex-wrap gap-2"><Badge tone="cyan">{d.enums.level[c.level as keyof typeof d.enums.level]}</Badge><DemoBadge show={c.is_test_data} label={d.common.demoBadge} /></div>
-            <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">{pick(c, "title", locale)}</h1>
-            <p className="mt-3 max-w-2xl text-lg text-white/80">{pick(c, "summary", locale)}</p>
-            <dl className="mt-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            <h1 className="mt-4 text-4xl font-extrabold leading-[1.1] tracking-tight text-navy-900 sm:text-5xl">{pick(c, "title", locale)}</h1>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted">{pick(c, "summary", locale)}</p>
+            <dl className="mt-8 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
               {[
                 [Users, d.programs.ages, c.age_min ? `${c.age_min}–${c.age_max}` : "—"],
                 [Clock, d.programs.duration, c.duration_weeks ? `${c.duration_weeks} ${d.common.weeks}` : "—"],
@@ -99,11 +99,11 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
                 [MonitorSmartphone, d.programs.mode, d.enums.mode[c.delivery_mode as keyof typeof d.enums.mode]],
               ].map(([Icon, k, v]) => {
                 const I = Icon as typeof Users;
-                return <div key={k as string}><dt className="flex items-center gap-1.5 text-white/60"><I className="size-4" aria-hidden />{k as string}</dt><dd className="mt-1 font-semibold">{v as string}</dd></div>;
+                return <div key={k as string}><dt className="flex items-center gap-1.5 text-subtle"><I className="size-4 text-royal-600" aria-hidden />{k as string}</dt><dd className="mt-1 font-semibold text-navy-900">{v as string}</dd></div>;
               })}
             </dl>
           </div>
-          <div className="relative aspect-[16/10] overflow-hidden rounded-3xl ring-1 ring-white/15">
+          <div className="relative aspect-[16/10] overflow-hidden rounded-[28px] bg-navy-900 ring-1 ring-line">
             {c.cover_url && <Image src={c.cover_url} alt="" fill priority sizes="(min-width:1024px) 40vw, 100vw" className="object-cover" />}
           </div>
         </Container>
