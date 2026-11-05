@@ -6,19 +6,19 @@
    WadiTech design tokens (see docs/DESIGN_SYSTEM.md)
    ========================================================= */
 @theme {
-  --color-navy-950: #0a1229;
-  --color-navy-900: #101c3d; /* Deep Navy (brand) */
-  --color-navy-800: #17285a;
-  --color-navy-700: #1e3474;
-  --color-royal-700: #1a42a8;
-  --color-royal-600: #2456d3; /* Royal Blue (brand) */
-  --color-royal-500: #3a6ae6;
-  --color-royal-100: #e3ebfd;
-  --color-royal-50: #f1f5fe;
-  --color-cyan-600: #13a5ab;
-  --color-cyan-500: #20c9cf; /* Turquoise (brand) */
-  --color-cyan-300: #7ee3e6;
-  --color-cyan-100: #d8f7f8;
+  --color-navy-950: #041228; /* robot face in the official logo */
+  --color-navy-900: #0a1a36; /* Deep Navy (brand) */
+  --color-navy-800: #11274f;
+  --color-navy-700: #193566;
+  --color-royal-700: #005a9e;
+  --color-royal-600: #006bbd; /* logo azure, darkened for AA text/buttons (5.5:1 on white) */
+  --color-royal-500: #0089eb; /* logo azure (the T) */
+  --color-royal-100: #d9edfc;
+  --color-royal-50: #edf6fe;
+  --color-cyan-600: #00869a; /* large text and icons on white */
+  --color-cyan-500: #00c6e0; /* logo cyan (the W) */
+  --color-cyan-300: #6fddf0;
+  --color-cyan-100: #d2f6fb;
 
   --color-ink: #0e1630;
   --color-muted: #4a5578;
@@ -38,8 +38,8 @@
   --font-arabic: "Cairo Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 
   --radius-card: 1.5rem;
-  --shadow-card: 0 1px 2px rgb(16 28 61 / 0.06), 0 8px 24px -12px rgb(16 28 61 / 0.18);
-  --shadow-lift: 0 2px 4px rgb(16 28 61 / 0.08), 0 18px 40px -18px rgb(16 28 61 / 0.35);
+  --shadow-card: 0 1px 2px rgb(10 26 54 / 0.06), 0 8px 24px -12px rgb(10 26 54 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(10 26 54 / 0.08), 0 18px 40px -18px rgb(10 26 54 / 0.35);
 }
 
 html {
@@ -71,9 +71,9 @@ html[lang="ar"] .font-latin { font-family: var(--font-sans); }
 .bg-neural {
   background-color: var(--color-navy-900);
   background-image:
-    radial-gradient(circle at 1px 1px, rgb(32 201 207 / 0.18) 1px, transparent 0),
-    radial-gradient(ellipse 80% 60% at 85% 10%, rgb(36 86 211 / 0.45), transparent 60%),
-    radial-gradient(ellipse 60% 50% at 0% 100%, rgb(32 201 207 / 0.18), transparent 60%);
+    radial-gradient(circle at 1px 1px, rgb(0 198 224 / 0.18) 1px, transparent 0),
+    radial-gradient(ellipse 80% 60% at 85% 10%, rgb(0 137 235 / 0.45), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgb(0 198 224 / 0.18), transparent 60%);
   background-size: 28px 28px, 100% 100%, 100% 100%;
 }
 

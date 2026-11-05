@@ -26,3 +26,10 @@ Factual record for the frontend redesign. No agent is listed as used unless it w
 - **Removed** the temporary `/design-preview/{a,b,c}` routes and their copy/data now that the direction is implemented.
 - **Verification (run):** typecheck clean; lint 0 errors; unit 59/59; DB/RLS 25/25; Playwright 46/46; every public page returns 200 with no horizontal overflow at 1440 px (EN) and 390 px (AR spot-checks).
 - **Merged `redesign` into `main`** at the owner's request for a working link. This updates the Vercel staging deployment only (APP_ENV=staging); the official domain, DNS and database schema are untouched.
+
+## Stage 4b — official logo and logo colours (owner request, 5 Nov 2026)
+
+- The owner re-supplied the official logo; it is pixel-identical to `logo-original.png`.
+- Found and removed two derived files that misrepresented it: `logo-square.png` (zoomed crop that cut the wordmark) and `logo-mark*.png` (background removal had turned the robot face white). Added `logo-official.png` (+512/192), a pure crop of the dark margin with the mark untouched. It is now used in the header (with no re-typeset "WADITECH ACADEMY" text), the footer, certificates and the favicon. The header is taller (72/80 px) so the logo reads.
+- Colour tokens now come from the logo: cyan `#00C6E0`, azure `#0089EB`, navy `#041228`/`#0A1A36`. AA-safe darker steps of the same hues are used for text and buttons (`#006BBD`, `#005A9E`, `#00869A`). The announcement bar moved to `royal-700` after axe flagged its badge.
+- Verified (run): build OK; unit 59/59; DB 25/25; Playwright 46/46 including axe on 10 pages in EN/AR.

@@ -21,7 +21,7 @@ export default async function CertificatePage({ params }: PageProps<"/[locale]/c
   const { data: c } = await (await createClient()).from("certificates").select("*").eq("certificate_number", number.toUpperCase()).maybeSingle();
   if (!c) notFound();
   const verifyUrl = `${env().NEXT_PUBLIC_SITE_URL}/${locale}/verify?n=${c.certificate_number}`;
-  const qr = await QRCode.toString(verifyUrl, { type: "svg", margin: 0, color: { dark: "#101C3D", light: "#00000000" } });
+  const qr = await QRCode.toString(verifyUrl, { type: "svg", margin: 0, color: { dark: "#0A1A36", light: "#00000000" } });
   const revoked = c.status !== "valid";
   return (
     <div className="bg-surface py-8 print:bg-white print:py-0">
@@ -34,7 +34,7 @@ export default async function CertificatePage({ params }: PageProps<"/[locale]/c
           <div className="bg-neural absolute inset-x-[10mm] top-[10mm] h-[34mm]" />
           <div className="relative flex h-full flex-col items-center px-[28mm] pt-[16mm] text-center">
             <div className="flex w-full items-center justify-between text-white">
-              <Image src="/media/brand/logo-mark-sm.png" alt="WadiTech Academy" width={150} height={112} className="h-[22mm] w-auto" />
+              <Image src="/media/brand/logo-official-512.png" alt="WadiTech Academy" width={120} height={120} className="h-[26mm] w-auto rounded-lg" />
               <div className="text-end"><p className="font-latin text-[11px] font-bold tracking-[0.3em] text-cyan-300">LEARN · BUILD · INNOVATE</p><p className="text-sm font-semibold">{d.meta.fullName}</p></div>
             </div>
             <h1 className="mt-[14mm] text-[30px] font-extrabold tracking-tight text-navy-900">{d.certificates.title}</h1>

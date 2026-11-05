@@ -42,7 +42,7 @@ export function ProgramFinder({ locale, courses, tracks, labels, initialAge, ini
     `inline-flex min-h-9 items-center rounded-full px-3.5 text-sm font-semibold ring-1 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100 ${active ? "bg-navy-900 text-white ring-navy-900" : "bg-white text-navy-900 ring-line hover:ring-royal-500"}`;
 
   return (
-    <div id="finder" className="scroll-mt-24 rounded-[28px] bg-white p-5 shadow-[0_1px_2px_rgb(16_28_61/0.06),0_24px_60px_-28px_rgb(16_28_61/0.35)] ring-1 ring-line sm:p-7">
+    <div id="finder" className="scroll-mt-24 rounded-[28px] bg-white p-5 shadow-[0_1px_2px_rgb(10_26_54/0.06),0_24px_60px_-28px_rgb(10_26_54/0.35)] ring-1 ring-line sm:p-7">
       <h2 className="text-xl font-bold text-navy-900">{labels.title}</h2>
       <div role="group" aria-label={labels.age} className="mt-5">
         <p className="mb-2 text-sm font-semibold text-muted">{labels.age}</p>

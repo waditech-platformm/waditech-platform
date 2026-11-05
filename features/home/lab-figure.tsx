@@ -18,7 +18,7 @@ export function LabFigure({ alt, labels, caption, logoAlt }: { alt: string; labe
       <div className="relative aspect-[4/3] overflow-hidden rounded-[28px] ring-1 ring-line sm:aspect-[21/9]">
         <Image src="/media/brand/lab-entrance.webp" alt={alt} fill sizes="(min-width:1280px) 1216px, 100vw" className="object-cover" />
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-          {CALLOUTS.map((c, i) => <circle key={i} cx={c.x} cy={c.y} r="0.9" fill="#20C9CF" stroke="white" strokeWidth="0.35" vectorEffect="non-scaling-stroke" />)}
+          {CALLOUTS.map((c, i) => <circle key={i} cx={c.x} cy={c.y} r="0.9" fill="#00C6E0" stroke="white" strokeWidth="0.35" vectorEffect="non-scaling-stroke" />)}
         </svg>
         {CALLOUTS.map((c, i) => {
           const flip = c.x > 60;

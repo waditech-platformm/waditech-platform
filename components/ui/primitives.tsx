@@ -25,7 +25,7 @@ export function SectionHeading({ eyebrow, title, subtitle, action, className, on
 export function PageHeader({ title, subtitle, eyebrow, children }: { title: string; subtitle?: string; eyebrow?: string; children?: React.ReactNode }) {
   return (
     <div className="relative overflow-hidden border-b border-line bg-white">
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_80%_at_85%_0%,rgb(32_201_207/0.10),transparent_70%),radial-gradient(45%_70%_at_5%_0%,rgb(36_86_211/0.07),transparent_70%)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_80%_at_85%_0%,rgb(0_198_224/0.10),transparent_70%),radial-gradient(45%_70%_at_5%_0%,rgb(0_137_235/0.07),transparent_70%)]" />
       <Container className="relative py-12 sm:py-16 lg:py-20">
         {eyebrow && <p className="wt-rise mb-3 text-sm font-semibold text-royal-600">{eyebrow}</p>}
         <h1 className="wt-rise max-w-4xl text-4xl font-extrabold leading-[1.1] tracking-tight text-navy-900 sm:text-5xl" style={{ "--i": 1 } as React.CSSProperties}>{title}</h1>
@@ -39,7 +39,7 @@ export function PageHeader({ title, subtitle, eyebrow, children }: { title: stri
 const badgeTones = {
   neutral: "bg-surface text-muted ring-line",
   blue: "bg-royal-50 text-royal-700 ring-royal-100",
-  cyan: "bg-cyan-100 text-[#0b6f73] ring-cyan-300/50",
+  cyan: "bg-cyan-100 text-[#006b7a] ring-cyan-300/50",
   success: "bg-success-bg text-success ring-success/20",
   warning: "bg-warning-bg text-warning ring-warning/20",
   danger: "bg-danger-bg text-danger ring-danger/20",

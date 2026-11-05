@@ -32,7 +32,7 @@ export function MobileMenu({ links, footer }: { links: { href: string; label: st
         {open ? <X className="size-5" /> : <Menu className="size-5" />}
       </button>
       {open && (
-        <div id="mobile-nav" className="fixed inset-x-0 top-16 bottom-0 z-50 overflow-y-auto bg-navy-950/98 px-4 pb-10 pt-4 backdrop-blur">
+        <div id="mobile-nav" className="fixed inset-x-0 top-[72px] bottom-0 z-50 overflow-y-auto bg-navy-950/98 px-4 pb-10 pt-4 backdrop-blur">
           <nav className="flex flex-col">
             {links.map((l) => (
               <Link key={l.href} href={l.href} className="border-b border-white/10 py-3.5 text-base font-semibold text-white">{l.label}</Link>

@@ -66,7 +66,7 @@ export default async function Home({ params, searchParams }: PageProps<"/[locale
     <>
       {/* ---------- HERO: large calm type + program finder ---------- */}
       <section className="relative overflow-hidden bg-white">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(60%_60%_at_80%_0%,rgb(32_201_207/0.12),transparent_70%),radial-gradient(50%_50%_at_10%_10%,rgb(36_86_211/0.08),transparent_70%)]" />
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(60%_60%_at_80%_0%,rgb(0_198_224/0.12),transparent_70%),radial-gradient(50%_50%_at_10%_10%,rgb(0_137_235/0.08),transparent_70%)]" />
         <Container className="relative grid grid-cols-1 items-center gap-12 py-14 sm:py-20 [&>*]:min-w-0 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:py-24">
           <div>
             <p className="wt-rise text-sm font-semibold text-royal-600" style={{ "--i": 0 } as React.CSSProperties}>{h.heroEyebrow}</p>

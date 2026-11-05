@@ -12,7 +12,7 @@ import { breakingNews } from "@/features/content/queries";
 import { AnnouncementBar } from "@/components/layout/announcement-bar";
 import { env } from "@/lib/env";
 
-export const viewport: Viewport = { themeColor: "#101C3D", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#0A1A36", width: "device-width", initialScale: 1 };
 
 export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Promise<Metadata> {
   const { locale } = await params;
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Pr
     applicationName: d.meta.siteName,
     alternates: { canonical: `/${l}`, languages: { en: "/en", ar: "/ar", "x-default": "/en" } },
     openGraph: { type: "website", siteName: d.meta.siteName, locale: l === "ar" ? "ar_JO" : "en_JO", images: ["/media/brand/lab-entrance.webp"] },
-    icons: { icon: "/media/brand/logo-square.png", apple: "/media/brand/logo-square.png" },
+    icons: { icon: "/media/brand/logo-official-192.png", apple: "/media/brand/logo-official-512.png" },
     // the development / staging build must never be indexed
     robots: env().APP_ENV === "production" ? undefined : { index: false, follow: false },
   };

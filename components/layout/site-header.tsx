@@ -13,14 +13,9 @@ import { signOutAction } from "@/features/identity/actions";
 
 export function Logo({ locale, dict, compact }: { locale: Locale; dict: Dict; compact?: boolean }) {
   return (
-    <Link href={`/${locale}`} className="flex items-center gap-2.5">
-      <Image src="/media/brand/logo-square.png" alt={compact ? dict.meta.siteName : ""} width={40} height={40} priority className="size-10 rounded-xl ring-1 ring-cyan-500/40" />
-      {!compact && (
-        <span className="font-latin leading-none text-white">
-          <span className="block text-[15px] font-extrabold tracking-wide">WADITECH</span>
-          <span className="block text-[10px] font-semibold tracking-[0.32em] text-cyan-300">ACADEMY</span>
-        </span>
-      )}
+    <Link href={`/${locale}`} className="flex items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label={dict.meta.fullName}>
+      {/* Official logo, unaltered (background margin trimmed only). */}
+      <Image src="/media/brand/logo-official-192.png" alt={dict.meta.fullName} width={96} height={96} priority className={`${compact ? "size-12" : "size-14 lg:size-16"} rounded-xl ring-1 ring-white/10`} />
     </Link>
   );
 }
@@ -60,7 +55,7 @@ export function SiteHeader({ locale, dict, viewer, unread }: { locale: Locale; d
   );
   return (
     <header className="sticky top-0 z-40 bg-navy-900/95 backdrop-blur supports-[backdrop-filter]:bg-navy-900/85">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-20 lg:px-8">
         <Logo locale={locale} dict={dict} />
         <nav aria-label={dict.nav.mainNav} className="hidden items-center gap-1 lg:flex">
           {primary.map((l) => (

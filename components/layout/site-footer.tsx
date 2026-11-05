@@ -15,7 +15,7 @@ export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dict }) {
     <footer className="bg-navy-950 text-white/75">
       <Container className="grid gap-10 py-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div>
-          <Image src="/media/brand/logo-mark-sm.png" alt={dict.meta.fullName} width={200} height={150} className="h-auto w-44" />
+          <Image src="/media/brand/logo-official-512.png" alt={dict.meta.fullName} width={176} height={176} className="size-44 rounded-2xl ring-1 ring-white/10" />
           <p className="mt-4 max-w-sm text-sm leading-relaxed">{dict.footer.about}</p>
           <p className="mt-3 text-xs font-bold tracking-[0.25em] text-cyan-300 font-latin">LEARN · BUILD · INNOVATE</p>
         </div>
