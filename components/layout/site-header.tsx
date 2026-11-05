@@ -8,6 +8,7 @@ import { homePath } from "@/lib/auth/roles";
 import { ButtonLink } from "@/components/ui/button";
 import { LanguageSwitcher } from "./language-switcher";
 import { MobileMenu } from "./mobile-menu";
+import { MoreMenu } from "./more-menu";
 import { signOutAction } from "@/features/identity/actions";
 
 export function Logo({ locale, dict, compact }: { locale: Locale; dict: Dict; compact?: boolean }) {
@@ -61,18 +62,11 @@ export function SiteHeader({ locale, dict, viewer, unread }: { locale: Locale; d
     <header className="sticky top-0 z-40 bg-navy-900/95 backdrop-blur supports-[backdrop-filter]:bg-navy-900/85">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Logo locale={locale} dict={dict} />
-        <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
+        <nav aria-label={dict.nav.mainNav} className="hidden items-center gap-1 lg:flex">
           {primary.map((l) => (
             <Link key={l.href} href={l.href} className="rounded-lg px-3 py-2 text-sm font-semibold text-white/85 hover:bg-white/10 hover:text-white">{l.label}</Link>
           ))}
-          <div className="group relative">
-            <button type="button" className="rounded-lg px-3 py-2 text-sm font-semibold text-white/85 hover:bg-white/10 hover:text-white" aria-haspopup="true">{dict.nav.more} ▾</button>
-            <div className="invisible absolute end-0 top-full z-50 w-56 translate-y-1 rounded-2xl bg-white p-2 opacity-0 shadow-[var(--shadow-lift)] ring-1 ring-line transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-              {secondary.map((l) => (
-                <Link key={l.href} href={l.href} className="block rounded-lg px-3 py-2 text-sm font-medium text-navy-900 hover:bg-royal-50">{l.label}</Link>
-              ))}
-            </div>
-          </div>
+          <MoreMenu label={dict.nav.more} links={secondary} />
         </nav>
         <div className="flex items-center gap-2">
           {viewer && (

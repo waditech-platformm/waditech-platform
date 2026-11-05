@@ -71,6 +71,7 @@ test("logout ends the session", async ({ page }) => {
   await page.goto("/en/dashboard");
   const logout = page.locator('form button[type="submit"]').filter({ hasText: /sign out|log out/i }).first();
   await logout.click();
+  await page.waitForURL((u) => !u.pathname.includes("/dashboard"));
   await page.goto("/en/dashboard");
   await expect(page).toHaveURL(/login/);
 });
