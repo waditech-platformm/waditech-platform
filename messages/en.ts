@@ -116,7 +116,6 @@ const en = {
     age1013: "Ages 10–13",
     age1418: "Ages 14–18",
     labCaption: "Inside the WadiTech lab",
-    labNote: "Design visualization of the lab space",
     callout1: "Trophy and project shelf",
     callout2: "Robotics lab entrance",
     callout3: "Coding stations",

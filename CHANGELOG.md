@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — Frontend redesign (2026-11-05)
+
+- New homepage: light hero with program finder (age band + track, works without JavaScript), annotated lab photo, competitions strip, learning journey, video filmstrip and photo bento, parents and schools panels, final call to action.
+- All public pages share the new look: light page headers, larger section headings, 24px cards, light program/event detail heroes.
+- Accessible "More" menu (aria-expanded, Escape, outside click) and localized main-nav label; dismissible announcement bar.
+- Removed the empty partners/testimonials block and the temporary design-preview routes.
+- Tests: new homepage spec (finder with/without JS, More menu keyboard, announcement dismissal); logout test waits for the sign-out redirect.
+
 ## 0.2.0 — 2026-11-05 (staging)
 ### Added
 - Email delivery for every in-app notification: provider adapter (`none` / `smtp` / `resend`), bilingual templates (preferred language first, links restricted to the platform), worker `/api/cron/notifications` protected by `CRON_SECRET`, retries with exponential backoff up to 5 attempts (migration `0009`).

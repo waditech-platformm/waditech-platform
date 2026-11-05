@@ -23,3 +23,8 @@ All three are built as real pages with live data and the academy's own media at 
 
 ## Recommendation
 Combine **C's hero (finder) with A's typography and restraint**, and use **B's filmstrip/bento** further down once real consent is confirmed. Final choice is WadiTech's.
+
+
+## Outcome
+
+The owner chose a merge of the three directions ("professional and comfortable"): C's program finder in the hero, A's typography and annotated lab image, B's filmstrip and bento. It is implemented on the homepage and carried to all public pages; the preview routes were removed.

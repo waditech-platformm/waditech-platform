@@ -18,3 +18,11 @@ Factual record for the frontend redesign. No agent is listed as used unless it w
 - **Content rules kept:** only published courses, published competitions, and media that RLS exposes publicly (students shown only when `consent_status = 'granted'`); no invented stats, partners or testimonials.
 - **Verification (run, local production build):** typecheck and lint clean (pre-existing warnings only); unit 59/59; DB/RLS 25/25; Playwright 46/46 including new `08-homepage.spec.ts` (finder with and without JavaScript, More menu keyboard, announcement dismissal); axe: no serious/critical violations on `/en` and `/ar`; no horizontal overflow at 390 and 1440 px in EN/AR. Lighthouse mobile home EN: performance 78/86/97 over three runs (median 86, baseline 85), accessibility 100, best practices 100, SEO 69 (only `is-crawlable`, intentional on staging); desktop 99–100.
 - **Test change:** `02-auth` logout test now waits for the sign-out redirect before re-visiting the dashboard (it raced the server action); assertion unchanged.
+
+## Stage 4 — remaining public pages, owner confirmations, merge
+
+- **Owner confirmations (5 Nov 2026):** parental consent exists for the student photos and videos used on the site; the two lab images are real photographs. The "Design visualization of the lab space" caption was removed accordingly.
+- **Applied the homepage language to every public page** through shared components: `PageHeader` is now light with large type and the same entrance motion; `SectionHeading` uses the larger calm scale; card radius is 24px site-wide; program and event detail heroes moved from dark to light. Pages covered: programs (+detail), labs, competitions, events (+detail), news, about, scholarships, schools, projects, gallery, verify, contact; auth pages inherit the card tokens.
+- **Removed** the temporary `/design-preview/{a,b,c}` routes and their copy/data now that the direction is implemented.
+- **Verification (run):** typecheck clean; lint 0 errors; unit 59/59; DB/RLS 25/25; Playwright 46/46; every public page returns 200 with no horizontal overflow at 1440 px (EN) and 390 px (AR spot-checks).
+- **Merged `redesign` into `main`** at the owner's request for a working link. This updates the Vercel staging deployment only (APP_ENV=staging); the official domain, DNS and database schema are untouched.

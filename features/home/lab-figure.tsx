@@ -12,7 +12,7 @@ const CALLOUTS = [
   { x: 83, y: 80 }, // reception desk with robot kits
 ];
 
-export function LabFigure({ alt, labels, caption, note, logoAlt }: { alt: string; labels: string[]; caption: string; note: string; logoAlt: string }) {
+export function LabFigure({ alt, labels, caption, logoAlt }: { alt: string; labels: string[]; caption: string; logoAlt: string }) {
   return (
     <figure className="relative">
       <div className="relative aspect-[4/3] overflow-hidden rounded-[28px] ring-1 ring-line sm:aspect-[21/9]">
@@ -34,7 +34,7 @@ export function LabFigure({ alt, labels, caption, note, logoAlt }: { alt: string
         </div>
       </div>
       <figcaption className="mt-4 flex flex-col gap-3 text-sm text-muted sm:flex-row sm:items-baseline sm:justify-between">
-        <span><span className="font-semibold text-navy-900">{caption}</span> <span className="text-subtle">— {note}</span></span>
+        <span className="font-semibold text-navy-900">{caption}</span>
         <ul className="grid grid-cols-2 gap-x-6 gap-y-1 sm:hidden">
           {labels.map((l) => <li key={l} className="flex items-center gap-2"><span aria-hidden className="size-2 rounded-full bg-cyan-500" />{l}</li>)}
         </ul>

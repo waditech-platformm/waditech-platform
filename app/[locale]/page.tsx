@@ -89,7 +89,7 @@ export default async function Home({ params, searchParams }: PageProps<"/[locale
       {/* ---------- THE LAB (annotated supplied image) ---------- */}
       <section className="bg-white pb-16 sm:pb-24">
         <Container>
-          <LabFigure alt={labAlt} labels={[h.callout1, h.callout2, h.callout3, h.callout4]} caption={h.labCaption} note={h.labNote} logoAlt={d.meta.fullName} />
+          <LabFigure alt={labAlt} labels={[h.callout1, h.callout2, h.callout3, h.callout4]} caption={h.labCaption} logoAlt={d.meta.fullName} />
         </Container>
       </section>
 
@@ -205,7 +205,6 @@ export default async function Home({ params, searchParams }: PageProps<"/[locale
           <div className="flex flex-col overflow-hidden rounded-[28px] bg-navy-900 text-white">
             <div className="relative aspect-[16/9]">
               <Image src="/media/brand/lab-classroom.webp" alt={locale === "ar" ? "محطات البرمجة والروبوتات داخل مختبر وادي تك" : "Coding and robotics workstations inside the WadiTech lab"} fill sizes="(min-width:1024px) 50vw, 100vw" className="object-cover" />
-              <span className="absolute bottom-3 start-3 rounded-md bg-navy-950/80 px-2 py-1 text-xs text-white/85">{h.labNote}</span>
             </div>
             <div className="flex flex-1 flex-col p-8 sm:p-10">
               <School className="size-8 text-cyan-300" aria-hidden />
