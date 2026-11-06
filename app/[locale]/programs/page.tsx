@@ -7,6 +7,7 @@ import { Input, Select, Label } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { CourseCard } from "@/components/cards";
 import { listCourses } from "@/features/catalog/queries";
+import { courseStats } from "@/features/community/queries";
 
 const CATS = ["robotics", "ai", "programming", "cybersecurity", "electronics", "embedded", "iot", "drones", "3d_printing", "stem"] as const;
 const AGES = [["", ""], ["8", "8"], ["10", "10"], ["12", "12"], ["14", "14"], ["16", "16"]] as const;
@@ -22,27 +23,30 @@ export default async function Programs({ params, searchParams }: PageProps<"/[lo
   const d = getDict(locale);
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : "");
-  const f = { category: one("category"), level: one("level"), mode: one("mode"), availability: one("availability"), age: Number(one("age")) || undefined, q: one("q") };
+  const f = { category: one("category"), level: one("level"), mode: one("mode"), availability: one("availability"), age: Number(one("age")) || undefined, grade: Number(one("grade")) || undefined, q: one("q") };
   const safe = {
     category: (CATS as readonly string[]).includes(f.category) ? f.category : undefined,
     level: ["beginner", "intermediate", "advanced"].includes(f.level) ? f.level : undefined,
     mode: ["in_person", "online", "hybrid"].includes(f.mode) ? f.mode : undefined,
     availability: ["open", "waitlist", "closed", "coming_soon"].includes(f.availability) ? f.availability : undefined,
     age: f.age && f.age >= 4 && f.age <= 99 ? f.age : undefined,
+    grade: f.grade && f.grade >= 1 && f.grade <= 12 ? f.grade : undefined,
     q: f.q.slice(0, 60) || undefined,
   };
-  const courses = await listCourses(safe);
+  const [courses, stats] = await Promise.all([listCourses(safe), courseStats()]);
   const active = Object.values(safe).some(Boolean);
   return (
     <>
       <PageHeader title={d.programs.title} subtitle={d.programs.subtitle} />
       <Container className="py-10">
-        <form method="get" className="grid gap-3 rounded-2xl bg-white p-4 ring-1 ring-line sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(5,1fr)_auto] lg:items-end" role="search">
+        <form method="get" className="grid gap-3 rounded-2xl bg-white p-4 ring-1 ring-line sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(6,1fr)_auto] lg:items-end" role="search">
           <div><Label htmlFor="q">{d.common.search}</Label><Input id="q" name="q" defaultValue={safe.q} placeholder={d.common.search} /></div>
           <div><Label htmlFor="category">{d.programs.category}</Label>
             <Select id="category" name="category" defaultValue={safe.category ?? ""}><option value="">{d.common.all}</option>{CATS.map((c) => <option key={c} value={c}>{d.enums.category[c]}</option>)}</Select></div>
           <div><Label htmlFor="age">{d.programs.ageGroup}</Label>
             <Select id="age" name="age" defaultValue={safe.age ? String(safe.age) : ""}>{AGES.map(([v]) => <option key={v} value={v}>{v ? `${v} ${d.common.years}` : d.common.all}</option>)}</Select></div>
+          <div><Label htmlFor="grade">{d.community.grade}</Label>
+            <Select id="grade" name="grade" defaultValue={safe.grade ? String(safe.grade) : ""}><option value="">{d.common.all}</option>{Array.from({ length: 12 }, (_, i) => i + 1).map((g) => <option key={g} value={g}>{d.community.gradeN.replace("{n}", String(g))}</option>)}</Select></div>
           <div><Label htmlFor="level">{d.programs.level}</Label>
             <Select id="level" name="level" defaultValue={safe.level ?? ""}><option value="">{d.common.all}</option>{(["beginner", "intermediate", "advanced"] as const).map((v) => <option key={v} value={v}>{d.enums.level[v]}</option>)}</Select></div>
           <div><Label htmlFor="mode">{d.programs.mode}</Label>
@@ -55,7 +59,7 @@ export default async function Programs({ params, searchParams }: PageProps<"/[lo
           <p aria-live="polite"><span className="font-bold text-navy-900">{courses.length}</span> {d.programs.results}</p>
           {active && <Link href={`/${locale}/programs`} className="font-semibold text-royal-600">{d.common.clearFilters}</Link>}
         </div>
-        <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{courses.map((c) => <CourseCard key={c.id} c={c} locale={locale} d={d} />)}</div>
+        <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{courses.map((c) => <CourseCard key={c.id} c={c} locale={locale} d={d} stats={stats.get(c.id)} />)}</div>
         {courses.length === 0 && <EmptyState title={d.programs.noResults} action={<Link href={`/${locale}/programs`} className="font-semibold text-royal-600">{d.common.clearFilters}</Link>} />}
       </Container>
     </>

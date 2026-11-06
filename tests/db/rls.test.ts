@@ -263,3 +263,96 @@ describe("email queue", () => {
     });
   });
 });
+
+describe("trainer profiles", () => {
+  it("the public sees only published profiles, with real teaching counts", () =>
+    as("anon", async (q) => {
+      const rows = (await q("select slug, courses, learners from public_trainers()")).rows;
+      expect(rows.map((r) => r.slug)).toEqual(["demo-lina"]); // Kareem's profile is still pending
+      expect(rows[0].courses).toBe(4);
+      expect(await count(q, "select count(*) n from trainer_profiles")).toBe(0); // raw table is private
+    }));
+  it("a trainer's edit goes back to review and cannot publish itself", () =>
+    as(U.trainer, async (q) => {
+      await q("update trainer_profiles set bio_en = 'Updated bio', status = 'published' where trainer_id = $1", [U.trainer]);
+      expect((await q("select status from trainer_profiles where trainer_id = $1", [U.trainer])).rows[0].status).toBe("pending");
+      expect((await q("select count(*) n from public_trainers()")).rows[0].n).toBe("0");
+    }));
+  it("a trainer cannot edit another trainer's profile; students cannot create one", async () => {
+    await as(U.trainer, async (q) => {
+      const r = await q("update trainer_profiles set bio_en = 'x' where trainer_id = $1", [U.trainer2]);
+      expect(r.rowCount).toBe(0);
+    });
+    await as(U.omar, (q) => refused(q, "insert into trainer_profiles(trainer_id, slug, display_name_en, display_name_ar) values ($1,'omar','Omar','عمر')", [U.omar]));
+  });
+  it("an admin can publish a pending profile", () =>
+    as(U.admin, async (q) => {
+      await q("update trainer_profiles set status = 'published' where trainer_id = $1", [U.trainer2]);
+      const r = (await q("select status, reviewed_by from trainer_profiles where trainer_id = $1", [U.trainer2])).rows[0];
+      expect(r).toEqual({ status: "published", reviewed_by: U.admin });
+    }));
+});
+
+describe("course reviews", () => {
+  const AI = "0c000000-0000-4000-a000-000000000003"; // Yazan completed this course
+  const ROBOTICS = "0c000000-0000-4000-a000-000000000001"; // Omar is active (not completed)
+  it("only a student who completed the course can review it, and it starts pending", async () => {
+    await as(U.omar, (q) => refused(q, "insert into course_reviews(course_id, author_id, student_id, author_role, rating, body) values ($1,$2,$2,'student',5,'Great course, loved it')", [ROBOTICS, U.omar]));
+    await as(U.omar, (q) => refused(q, "insert into course_reviews(course_id, author_id, student_id, author_role, rating, body) values ($1,$2,$3,'student',5,'Pretending to be Yazan')", [AI, U.omar, U.yazan]));
+    await as(U.yazan, async (q) => {
+      await q("delete from course_reviews where author_id = $1", [U.yazan]);
+      await q("insert into course_reviews(course_id, author_id, student_id, author_role, rating, body, status, featured) values ($1,$2,$2,'student',4,'Really enjoyed the projects',  'approved', true)", [AI, U.yazan]);
+      expect((await q("select status, featured from course_reviews where author_id = $1", [U.yazan])).rows[0]).toEqual({ status: "pending", featured: false });
+    });
+  });
+  it("a verified parent can review their child's completed course; an unlinked parent cannot", async () => {
+    await as(U.admin, async (q) => {
+      await q("update enrollments set status = 'completed', completed_at = now() where course_id = $1 and student_id = $2", [ROBOTICS, U.omar]);
+      await q("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: U.parent, role: "authenticated" })]);
+      await q("insert into course_reviews(course_id, author_id, student_id, author_role, rating, body) values ($1,$2,$3,'student',5,'My son built his first robot')", [ROBOTICS, U.parent, U.omar]);
+      expect((await q("select author_role, status from course_reviews where author_id = $1", [U.parent])).rows[0]).toEqual({ author_role: "parent", status: "pending" });
+      await q("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: U.parent2, role: "authenticated" })]);
+      await refused(q, "insert into course_reviews(course_id, author_id, student_id, author_role, rating, body) values ($1,$2,$3,'parent',1,'Not my child at all')", [ROBOTICS, U.parent2, U.omar]);
+    });
+  });
+  it("the public sees approved reviews only, with first name and no account ids", () =>
+    as("anon", async (q) => {
+      expect(await count(q, "select count(*) n from course_reviews")).toBe(0);
+      const rows = (await q("select * from public_reviews($1)", [AI])).rows;
+      expect(rows).toHaveLength(1);
+      expect(rows[0].author_first_name).toBe("Yazan");
+      expect(Object.keys(rows[0])).not.toContain("author_id");
+      const s = (await q("select learners, rating, reviews from public_course_stats() where course_id = $1", [AI])).rows[0];
+      expect(s).toEqual({ learners: 1, rating: "5.0", reviews: 1 });
+    }));
+});
+
+describe("resource library", () => {
+  it("anonymous visitors see locked items without their link", () =>
+    as("anon", async (q) => {
+      const rows = (await q("select title_en, access, unlocked, url from library_items()")).rows;
+      expect(rows.map((r) => r.access)).toEqual(["public", "registered", "enrolled"]); // the draft is hidden
+      expect(rows.filter((r) => r.unlocked).map((r) => r.access)).toEqual(["public"]);
+      expect(rows.filter((r) => !r.unlocked).every((r) => r.url === null)).toBe(true);
+      expect(await count(q, "select count(*) n from resources")).toBe(0);
+    }));
+  it("enrolled students unlock their course's resources; others do not", async () => {
+    await as(U.omar, async (q) => expect((await q("select bool_and(unlocked) ok from library_items()")).rows[0].ok).toBe(true));
+    await as(U.yazan, async (q) => {
+      const r = (await q("select access, unlocked from library_items() where access = 'enrolled'")).rows[0];
+      expect(r.unlocked).toBe(true); // Yazan is active in Robotics Foundations
+    });
+    await as(U.parent2, async (q) => {
+      const r = (await q("select unlocked, url from library_items() where access = 'enrolled'")).rows[0];
+      expect(r).toEqual({ unlocked: false, url: null });
+    });
+  });
+  it("filters by track and grade, and only admins can write", async () => {
+    await as("anon", async (q) => {
+      expect((await q("select count(*) n from library_items('electronics')")).rows[0].n).toBe("1");
+      expect((await q("select count(*) n from library_items(null, 2)")).rows[0].n).toBe("0");
+    });
+    await as(U.trainer, (q) => refused(q, "insert into resources(title_en, title_ar, kind, url) values ('Trainer file','ملف','link','https://example.org')"));
+    await as(U.admin, async (q) => { await q("insert into resources(title_en, title_ar, kind, url) values ('Admin file','ملف','link','https://example.org')"); });
+  });
+});

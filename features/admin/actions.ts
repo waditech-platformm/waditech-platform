@@ -37,17 +37,18 @@ const courseSchema = z.object({
   level: z.enum(["beginner", "intermediate", "advanced"]),
   delivery_mode: z.enum(["in_person", "online", "hybrid"]),
   availability: z.enum(["open", "waitlist", "closed", "coming_soon"]),
-  age_min: optInt(4, 99), age_max: optInt(4, 99), duration_weeks: optInt(1, 104), hours_total: optInt(1, 2000),
+  age_min: optInt(4, 99), age_max: optInt(4, 99), grade_min: optInt(1, 12), grade_max: optInt(1, 12), duration_weeks: optInt(1, 104), hours_total: optInt(1, 2000),
   price_amount: z.preprocess((v) => (v === "" ? 0 : Number(v)), z.number().min(0, "number").max(100000, "number")),
   currency: z.enum(["JOD", "USD"]),
   capacity: optInt(1, 10000),
   thumbnail_url: optUrl, cover_url: optUrl, preview_video_url: optUrl,
   program_id: uuid.nullable(),
-}).refine((v) => v.age_min === null || v.age_max === null || v.age_max >= v.age_min, { path: ["age_max"], message: "number" });
+}).refine((v) => v.age_min === null || v.age_max === null || v.age_max >= v.age_min, { path: ["age_max"], message: "number" })
+  .refine((v) => v.grade_min === null || v.grade_max === null || v.grade_max >= v.grade_min, { path: ["grade_max"], message: "number" });
 
 export async function saveCourseAction(_: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const { locale, supabase, uid, d } = await ctx(fd);
-  const raw = Object.fromEntries(["title_en", "title_ar", "slug", "summary_en", "summary_ar", "description_en", "description_ar", "category", "level", "delivery_mode", "availability", "age_min", "age_max", "duration_weeks", "hours_total", "price_amount", "currency", "capacity", "thumbnail_url", "cover_url", "preview_video_url", "program_id"].map((k) => [k, fdOptional(fd, k)]));
+  const raw = Object.fromEntries(["title_en", "title_ar", "slug", "summary_en", "summary_ar", "description_en", "description_ar", "category", "level", "delivery_mode", "availability", "age_min", "age_max", "grade_min", "grade_max", "duration_weeks", "hours_total", "price_amount", "currency", "capacity", "thumbnail_url", "cover_url", "preview_video_url", "program_id"].map((k) => [k, fdOptional(fd, k)]));
   const parsed = courseSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: zodErrors(parsed.error, locale) };
   const row = { ...parsed.data, outcomes_en: fdLines(fd, "outcomes_en"), outcomes_ar: fdLines(fd, "outcomes_ar"), requirements_en: fdLines(fd, "requirements_en"), requirements_ar: fdLines(fd, "requirements_ar"), featured: bool(fd, "featured"), requires_approval: bool(fd, "requires_approval") };
@@ -433,4 +434,46 @@ export async function broadcastAction(_: ActionResult | null, fd: FormData): Pro
   if (!parsed.success) return { ok: false, fieldErrors: zodErrors(parsed.error, locale) };
   const { data, error } = await supabase.rpc("broadcast_announcement", { p_role: parsed.data.role, p_title_en: parsed.data.title_en, p_title_ar: parsed.data.title_ar, p_body_en: parsed.data.body_en, p_body_ar: parsed.data.body_ar, p_link: parsed.data.link });
   return error ? { ok: false, error: dbError(error, locale) } : { ok: true, message: `${d.admin.sent}: ${data}` };
+}
+
+/* ------------------------------ TRAINER PROFILES / REVIEWS / LIBRARY ------------------------------ */
+export async function setTrainerProfileStatusAction(_: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const { locale, supabase } = await ctx(fd);
+  const s = z.object({ id: uuid, status: z.enum(["published", "hidden", "pending"]) }).safeParse({ id: fdString(fd, "id"), status: fdString(fd, "status") });
+  if (!s.success) return { ok: false };
+  const { error } = await supabase.from("trainer_profiles").update({ status: s.data.status }).eq("trainer_id", s.data.id);
+  revalidatePath(`/${locale}/trainers`);
+  return error ? { ok: false, error: dbError(error, locale) } : ok(locale);
+}
+export async function moderateReviewAction(_: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const { locale, supabase } = await ctx(fd);
+  const s = z.object({ id: uuid, status: z.enum(["approved", "rejected", "pending"]), featured: z.boolean() })
+    .safeParse({ id: fdString(fd, "id"), status: fdString(fd, "status"), featured: fdString(fd, "featured") === "true" });
+  if (!s.success) return { ok: false };
+  const { error } = await supabase.from("course_reviews").update({ status: s.data.status, featured: s.data.status === "approved" && s.data.featured }).eq("id", s.data.id);
+  revalidatePath(`/${locale}`);
+  return error ? { ok: false, error: dbError(error, locale) } : ok(locale);
+}
+export async function saveResourceAction(_: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const { locale, supabase } = await ctx(fd);
+  const parsed = z.object({
+    title_en: z.string().trim().min(3, "min").max(160, "max"), title_ar: z.string().trim().min(2, "min").max(160, "max"),
+    description_en: z.string().trim().max(600, "max").nullable(), description_ar: z.string().trim().max(600, "max").nullable(),
+    kind: z.enum(["pdf", "video", "worksheet", "link", "code"]),
+    url: z.string().trim().max(500).regex(/^(https:\/\/|\/)/, "url"),
+    category: z.enum(["robotics", "ai", "programming", "cybersecurity", "electronics", "embedded", "iot", "drones", "3d_printing", "stem"]).nullable(),
+    grade_min: optInt(1, 12), grade_max: optInt(1, 12),
+    course_id: uuid.nullable(),
+    access: z.enum(["public", "registered", "enrolled"]),
+    status: z.enum(["draft", "published", "archived"]),
+    position: optInt(0, 9999),
+  }).refine((v) => v.access !== "enrolled" || v.course_id, { path: ["course_id"], message: "required" })
+    .refine((v) => v.grade_min === null || v.grade_max === null || v.grade_max >= v.grade_min, { path: ["grade_max"], message: "number" })
+    .safeParse(Object.fromEntries(["title_en", "title_ar", "description_en", "description_ar", "kind", "url", "category", "grade_min", "grade_max", "course_id", "access", "status", "position"].map((k) => [k, fdOptional(fd, k)])));
+  if (!parsed.success) return { ok: false, fieldErrors: zodErrors(parsed.error, locale) };
+  const row = { ...parsed.data, position: parsed.data.position ?? 0 };
+  const id = fdString(fd, "id");
+  const { error } = id ? await supabase.from("resources").update(row).eq("id", id) : await supabase.from("resources").insert(row);
+  revalidatePath(`/${locale}/library`);
+  return error ? { ok: false, error: dbError(error, locale) } : ok(locale);
 }

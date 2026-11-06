@@ -16,7 +16,7 @@ export default async function AdminLayout({ children, params }: LayoutProps<"/[l
     { href: a(""), label: d.admin.overview, exact: true }, { href: a("/analytics"), label: d.admin.analytics }, { href: a("/users"), label: d.admin.users }, { href: a("/courses"), label: d.admin.courses },
     { href: a("/enrollments"), label: d.admin.enrollments }, { href: a("/certificates"), label: d.admin.certificates }, { href: a("/news"), label: d.admin.news },
     { href: a("/events"), label: d.admin.events }, { href: a("/competitions"), label: d.admin.competitions }, { href: a("/scholarships"), label: d.admin.scholarships },
-    { href: a("/labs"), label: d.admin.labs }, { href: a("/media"), label: d.admin.media }, { href: a("/payments"), label: d.admin.payments },
+    { href: a("/labs"), label: d.admin.labs }, { href: a("/library"), label: d.admin.library }, { href: a("/trainers"), label: d.admin.trainerProfiles }, { href: a("/reviews"), label: d.admin.reviews }, { href: a("/media"), label: d.admin.media }, { href: a("/payments"), label: d.admin.payments },
     { href: a("/families"), label: d.admin.families }, { href: a("/projects"), label: d.admin.projects }, { href: a("/schools"), label: d.admin.schools },
     { href: a("/messages"), label: d.admin.messages }, { href: a("/notifications"), label: d.admin.notifications }, { href: a("/audit"), label: d.admin.audit },
   ] : [{ href: `/${locale}/trainer`, label: d.trainer.title }];

@@ -322,4 +322,25 @@ insert into public.student_projects(student_id, course_id, title, description, c
 insert into public.notifications(user_id, kind, title_en, title_ar, body_en, body_ar, link) values
  ('00000000-0000-4000-a000-000000000005','announcement','Welcome to the demo environment','مرحبًا بك في بيئة التجربة','All data you see here is fictional test data.','جميع البيانات هنا بيانات اختبار وهمية.','/dashboard');
 
+
+-- ---------- 0010: grades, trainer profiles, reviews, library (fictional test data) ----------
+update public.courses set grade_min = greatest(1, age_min - 5), grade_max = least(12, age_max - 5) where age_min is not null and age_max is not null;
+
+insert into public.trainer_profiles(trainer_id, slug, display_name_en, display_name_ar, headline_en, headline_ar, bio_en, bio_ar, specialties, years_experience, status, is_test_data) values
+ ('00000000-0000-4000-a000-000000000003','demo-lina','Lina (demo)','لينا (تجريبي)','Robotics & electronics trainer (demo)','مدرّبة روبوتات وإلكترونيات (تجريبي)',
+  'Fictional demo profile used for testing. Real trainer profiles are written by the trainers and approved by the academy.',
+  'ملف تجريبي وهمي لأغراض الاختبار. ملفات المدربين الحقيقية يكتبها المدربون وتوافق عليها الأكاديمية.', '{robotics,electronics,3d_printing}', 6, 'published', true),
+ ('00000000-0000-4000-a000-000000000004','demo-kareem','Kareem (demo)','كريم (تجريبي)','Programming & AI trainer (demo)','مدرّب برمجة وذكاء اصطناعي (تجريبي)',
+  'Fictional demo profile used for testing.', 'ملف تجريبي وهمي لأغراض الاختبار.', '{programming,ai,cybersecurity}', 4, 'pending', true);
+
+insert into public.course_reviews(course_id, author_id, student_id, author_role, rating, body, locale, status, featured, is_test_data) values
+ ('0c000000-0000-4000-a000-000000000003','00000000-0000-4000-a000-000000000009','00000000-0000-4000-a000-000000000009','student',5,
+  '[Demo] Fictional test review: the projects were fun and I trained my first image model.','en','approved', true, true);
+
+insert into public.resources(title_en, title_ar, description_en, description_ar, kind, url, category, grade_min, grade_max, course_id, access, status, position, is_test_data) values
+ ('[Demo] Arduino pin-out cheat sheet','[تجريبي] ورقة مرجعية لمنافذ أردوينو','Fictional test resource.','مورد تجريبي وهمي.','pdf','https://docs.arduino.cc/hardware/uno-rev3/','electronics',5,12,null,'public','published',1,true),
+ ('[Demo] Python practice in the browser','[تجريبي] تدرّب على بايثون في المتصفح','Fictional test resource.','مورد تجريبي وهمي.','link','https://www.python.org/shell/','programming',4,12,null,'registered','published',2,true),
+ ('[Demo] Robotics Foundations worksheet','[تجريبي] ورقة عمل أساسيات الروبوتات','Only for students enrolled in Robotics Foundations.','للطلاب المسجّلين في أساسيات الروبوتات فقط.','worksheet','/media/brand/lab-classroom.webp','robotics',4,8,'0c000000-0000-4000-a000-000000000001','enrolled','published',3,true),
+ ('[Demo] Draft resource','[تجريبي] مورد مسودة','Not published.','غير منشور.','link','https://example.org/','ai',null,null,null,'public','draft',4,true);
+
 commit;

@@ -8,6 +8,9 @@ import { ButtonLink } from "@/components/ui/button";
 import { listCourses } from "@/features/catalog/queries";
 import { listCompetitions, listLabs, listMedia } from "@/features/content/queries";
 import { HeroSlides } from "@/features/home/hero-slides";
+import { publicReviews } from "@/features/community/queries";
+import { Star } from "lucide-react";
+import { DemoBadge } from "@/components/ui/primitives";
 
 /** Product names of lab providers (brand names, same in both languages). */
 const PROVIDERS: Record<string, string> = { wokwi: "Wokwi", python_online: "Python", tinkercad: "Tinkercad", scratch: "Scratch", internal: "WadiTech" };
@@ -38,7 +41,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
   const h = d.home;
   const nf = nfFor(locale);
   const p = (s: string) => `/${locale}${s}`;
-  const [courses, labs, comps, photos] = await Promise.all([listCourses(), listLabs(), listCompetitions(4), listMedia({ kind: "image", limit: 14 })]);
+  const [courses, labs, comps, photos, testimonials] = await Promise.all([listCourses(), listLabs(), listCompetitions(4), listMedia({ kind: "image", limit: 14 }), publicReviews(null, 3)]);
 
   // Real facts only, computed from published data.
   const cats = d.enums.category as Record<string, string>;
@@ -244,6 +247,30 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
           </div>
         </Container>
       </section>
+
+      {/* 7b — Testimonials: only approved, featured reviews from verified learners/parents */}
+      {testimonials.length > 0 && (
+        <section className="bg-surface py-20 sm:py-28">
+          <Container>
+            <SectionHead eyebrow={d.community.testimonialsEyebrow} title={d.community.testimonialsTitle} />
+            <ul className="grid gap-5 md:grid-cols-3">
+              {testimonials.map((t) => (
+                <li key={t.id}>
+                  <figure className="flex h-full flex-col rounded-[24px] bg-white p-7 ring-1 ring-line">
+                    <span className="flex" role="img" aria-label={d.community.stars.replace("{n}", String(t.rating))}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`size-4 ${n <= t.rating ? "fill-amber-400 text-amber-400" : "text-line"}`} aria-hidden />)}</span>
+                    <blockquote className="mt-4 flex-1 text-lg leading-relaxed text-navy-900" lang={t.locale}>{t.body}</blockquote>
+                    <figcaption className="mt-6 border-t border-line pt-4 text-sm">
+                      <span className="font-semibold text-navy-900">{t.author_first_name}</span> <span className="text-subtle">· {t.author_role === "parent" ? d.community.parent : d.community.student}</span>
+                      <Link href={p(`/programs/${t.course_slug}`)} className="mt-1 block text-royal-600 hover:underline">{pick({ title_en: t.course_title_en, title_ar: t.course_title_ar }, "title", locale)}</Link>
+                      <DemoBadge show={t.is_test_data} label={d.common.demoBadge} />
+                    </figcaption>
+                  </figure>
+                </li>
+              ))}
+            </ul>
+          </Container>
+        </section>
+      )}
 
       {/* 8 — Gallery */}
       {gallery.length > 0 && (

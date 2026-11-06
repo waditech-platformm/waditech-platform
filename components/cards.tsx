@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { CalendarDays, Clock, MapPin, Users, FlaskConical, ArrowUpRight } from "lucide-react";
+import { CalendarDays, Clock, MapPin, Users, FlaskConical, ArrowUpRight, Star, GraduationCap } from "lucide-react";
 import type { Locale } from "@/lib/i18n/config";
 import { formatDate, formatDateTime, formatMoney, pick } from "@/lib/i18n/config";
 import type { Dict } from "@/messages/en";
@@ -13,7 +13,29 @@ export function priceLabel(c: Pick<Course, "price_amount" | "currency">, locale:
 }
 const availTone = { open: "success", waitlist: "warning", closed: "neutral", coming_soon: "blue" } as const;
 
-export function CourseCard({ c, locale, d }: { c: Course; locale: Locale; d: Dict }) {
+export type CardStats = { learners: number; rating: number | null; reviews: number };
+
+/** Real learner count and approved rating; renders nothing when there is nothing real to show. */
+export function CourseStatsLine({ s, d, locale, className = "" }: { s?: CardStats; d: Dict; locale: Locale; className?: string }) {
+  if (!s || (s.learners === 0 && !s.reviews)) return null;
+  const nf = new Intl.NumberFormat(locale === "ar" ? "ar-JO" : "en-JO", { maximumFractionDigits: 1 });
+  const c = d.community;
+  return (
+    <span className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className}`}>
+      {s.reviews > 0 && s.rating !== null && (
+        <span className="inline-flex items-center gap-1 font-semibold text-navy-900">
+          <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
+          <span className="sr-only">{c.ratingOutOf.replace("{r}", nf.format(s.rating))}</span>
+          <span aria-hidden>{nf.format(s.rating)}</span>
+          <span className="font-normal text-subtle">({s.reviews === 1 ? c.reviewsCount1 : c.reviewsCountN.replace("{n}", nf.format(s.reviews))})</span>
+        </span>
+      )}
+      {s.learners > 0 && <span className="text-subtle">{s.learners === 1 ? c.learners1 : c.learnersN.replace("{n}", nf.format(s.learners))}</span>}
+    </span>
+  );
+}
+
+export function CourseCard({ c, locale, d, stats }: { c: Course; locale: Locale; d: Dict; stats?: CardStats }) {
   return (
     <Link href={`/${locale}/programs/${c.slug}`} className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-white ring-1 ring-line shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-lift)]">
       <div className="relative aspect-[16/10] overflow-hidden bg-navy-900">
@@ -30,10 +52,12 @@ export function CourseCard({ c, locale, d }: { c: Course; locale: Locale; d: Dic
         <p className="mt-1.5 line-clamp-2 text-sm text-muted">{pick(c, "summary", locale)}</p>
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-subtle">
           {c.age_min && <span className="inline-flex items-center gap-1"><Users className="size-3.5" aria-hidden />{d.programs.ages} {c.age_min}–{c.age_max}</span>}
+          {c.grade_min && c.grade_max && <span className="inline-flex items-center gap-1"><GraduationCap className="size-3.5" aria-hidden />{d.community.gradesRange.replace("{a}", String(c.grade_min)).replace("{b}", String(c.grade_max))}</span>}
           {c.duration_weeks && <span className="inline-flex items-center gap-1"><Clock className="size-3.5" aria-hidden />{c.duration_weeks} {d.common.weeks}</span>}
           <span>{d.enums.level[c.level as keyof Dict["enums"]["level"]]}</span>
           <span>{d.enums.mode[c.delivery_mode as keyof Dict["enums"]["mode"]]}</span>
         </div>
+        <CourseStatsLine s={stats} d={d} locale={locale} className="mt-3 text-xs" />
         <div className="mt-auto flex items-center justify-between pt-5">
           <span className="text-base font-extrabold text-navy-900">{priceLabel(c, locale, d)}</span>
           <Badge tone={availTone[c.availability as keyof typeof availTone] ?? "neutral"}>{d.enums.availability[c.availability as keyof Dict["enums"]["availability"]]}</Badge>

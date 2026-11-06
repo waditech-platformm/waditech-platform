@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 — Trainers, reviews, library, grades (2026-11-06, branch feature/steam-parity)
+
+- **Trainer profiles:** public `/trainers` and `/trainers/[slug]` pages with real program and learner counts. Trainers edit their profile in the portal; every edit goes back to review, and only admins publish (`/admin/trainers`). Program pages link to published profiles.
+- **Verified reviews:**
+  - Only a student who completed the course, or that student's verified parent, can review. This is enforced in the database.
+  - Every review is moderated (`/admin/reviews`). Public reviews show first name and role only.
+  - Ratings and real learner counts appear on cards and program pages. Homepage testimonials appear only when an admin features an approved review.
+- **Resource library:** `/library`, filterable by track, grade and type. Each item is public, for signed-in users, or for enrolled students; locked items show no link. Admins manage it in `/admin/library`.
+- **School grades:** `grade_min`/`grade_max` on courses; grade filter on Programs; shown on cards and program pages.
+- **Database:** migration `20261106001000_community.sql` (3 tables, RLS, 7 read functions). **Not applied to staging yet — awaiting owner approval.**
+- **Tests:** DB 35 (10 new); Playwright 57 (6 new, plus axe on trainers and library pages).
+
 ## 0.3.0 — Frontend redesign (2026-11-05)
 
 - New homepage: light hero with program finder (age band + track, works without JavaScript), annotated lab photo, competitions strip, learning journey, video filmstrip and photo bento, parents and schools panels, final call to action.

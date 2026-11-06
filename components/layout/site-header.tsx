@@ -33,6 +33,8 @@ export function SiteHeader({ locale, dict, viewer, unread }: { locale: Locale; d
     { href: p("/events"), label: dict.nav.events },
     { href: p("/news"), label: dict.nav.news },
     { href: p("/scholarships"), label: dict.nav.scholarships },
+    { href: p("/trainers"), label: dict.nav.trainers },
+    { href: p("/library"), label: dict.nav.library },
     { href: p("/projects"), label: dict.nav.projects },
     { href: p("/gallery"), label: dict.nav.gallery },
     { href: p("/verify"), label: dict.nav.verify },

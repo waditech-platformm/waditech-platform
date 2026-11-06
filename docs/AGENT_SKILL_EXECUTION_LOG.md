@@ -51,3 +51,11 @@ Factual record for the frontend redesign. No agent is listed as used unless it w
 - **Header and footer:** white header; primary nav cut to Programs, Schools, Labs, Competitions, About + More. Footer reorganised; no links to pages that don't exist (privacy/terms pages are still missing).
 - **Content rule:** the "Future Makers" pathway and its figures from the owner's page were **not** added, because no such program exists in the database yet. Add it as a real program first.
 - **Verified (run):** build OK; lint 0 errors; unit 59/59; DB 25/25; Playwright 47/47 (new tests: track cards → filtered programs with matching counts; slideshow pause and number navigation); axe clean on 10 pages; no overflow at 360/390/1440 in EN/AR. The local DB was reset before the run because repeated runs had filled a test course to capacity.
+
+## Stage 6 — parity with steamcenter.co where it adds value (6 Nov 2026)
+
+- **Analysis:** STEAM Center is mainly an online course storefront. Its features missing from WadiTech were public instructor profiles, a resource library, student/parent reviews, grade-based browsing, and visible enrollment counts. Everything else it offers, WadiTech already has.
+- **Built on branch `feature/steam-parity`:** see CHANGELOG 0.4.0.
+- **Content rules:** no invented trainers, reviews or resources. Seed rows are flagged `is_test_data` and marked "[Demo]". Testimonials render only from approved, featured, verified reviews.
+- **Verified (run, local):** build OK; lint 0 errors; unit 69/69 (run with `npm test`); DB 35/35; Playwright 57/57. No overflow at 390 and 1440 px.
+- **Pending:** owner approval to apply the migration to the staging database, then merge to `main`.

@@ -25,6 +25,8 @@ export function CourseForm({ d, c, programs }: { d: Dict; c?: Partial<Course> & 
         <SelectField name="availability" label={d.programs.availability} defaultValue={c?.availability ?? "open"} options={(["open", "waitlist", "closed", "coming_soon"] as const).map((k) => [k, d.enums.availability[k]])} />
         <TextField name="age_min" label={a.ageMin} type="number" defaultValue={c?.age_min} />
         <TextField name="age_max" label={a.ageMax} type="number" defaultValue={c?.age_max} />
+        <TextField name="grade_min" label={a.gradeMin} type="number" min={1} max={12} defaultValue={c?.grade_min} />
+        <TextField name="grade_max" label={a.gradeMax} type="number" min={1} max={12} defaultValue={c?.grade_max} />
         <TextField name="duration_weeks" label={a.durationWeeks} type="number" defaultValue={c?.duration_weeks} />
         <TextField name="hours_total" label={a.hoursTotal} type="number" defaultValue={c?.hours_total} />
         <TextField name="price_amount" label={a.price} type="number" step="0.001" defaultValue={c?.price_amount ?? 0} />

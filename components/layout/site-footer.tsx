@@ -7,8 +7,8 @@ import { Container } from "@/components/ui/primitives";
 export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dict }) {
   const p = (s: string) => `/${locale}${s}`;
   const cols = [
-    { title: dict.footer.explore, links: [[p("/programs"), dict.nav.programs], [p("/labs"), dict.nav.labs], [p("/competitions"), dict.nav.competitions], [p("/scholarships"), dict.nav.scholarships], [p("/events"), dict.nav.events]] },
-    { title: dict.footer.academy, links: [[p("/about"), dict.nav.about], [p("/schools"), dict.nav.schools], [p("/news"), dict.nav.news], [p("/gallery"), dict.nav.gallery], [p("/projects"), dict.nav.projects]] },
+    { title: dict.footer.explore, links: [[p("/programs"), dict.nav.programs], [p("/labs"), dict.nav.labs], [p("/competitions"), dict.nav.competitions], [p("/library"), dict.nav.library], [p("/scholarships"), dict.nav.scholarships], [p("/events"), dict.nav.events]] },
+    { title: dict.footer.academy, links: [[p("/about"), dict.nav.about], [p("/trainers"), dict.nav.trainers], [p("/schools"), dict.nav.schools], [p("/news"), dict.nav.news], [p("/gallery"), dict.nav.gallery], [p("/projects"), dict.nav.projects]] },
     { title: dict.footer.support, links: [[p("/contact"), dict.nav.contact], [p("/verify"), dict.nav.verify], [p("/login"), dict.nav.login], [p("/register"), dict.nav.register]] },
   ];
   return (

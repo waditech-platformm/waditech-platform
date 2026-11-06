@@ -7,17 +7,18 @@ import { locales } from "@/lib/i18n/config";
 // Rendered per request (not at build time) so builds never depend on database access.
 export const dynamic = "force-dynamic";
 
-const STATIC = ["", "programs", "labs", "news", "events", "competitions", "scholarships", "schools", "projects", "gallery", "about", "contact", "verify"];
+const STATIC = ["", "programs", "labs", "news", "events", "competitions", "scholarships", "schools", "projects", "gallery", "about", "contact", "verify", "trainers", "library"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const e = env();
   const base = e.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   const db = createAnon(e.NEXT_PUBLIC_SUPABASE_URL, e.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-  const [courses, news, events, labs] = await Promise.all([
+  const [courses, news, events, labs, trainers] = await Promise.all([
     db.from("courses").select("slug, updated_at").eq("status", "published"),
     db.from("news_articles").select("slug, updated_at").eq("status", "published"),
     db.from("events").select("slug, updated_at").eq("status", "published"),
     db.from("labs").select("slug").eq("status", "published"),
+    db.rpc("public_trainers"),
   ]);
   const entry = (path: string, lastModified?: string): MetadataRoute.Sitemap[number] => ({
     url: `${base}/en${path}`,
@@ -30,5 +31,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...(news.data ?? []).map((r) => entry(`/news/${r.slug}`, r.updated_at)),
     ...(events.data ?? []).map((r) => entry(`/events/${r.slug}`, r.updated_at)),
     ...(labs.data ?? []).map((r) => entry(`/labs/${r.slug}`)),
+    ...((trainers.data ?? []) as { slug: string }[]).map((r) => entry(`/trainers/${r.slug}`)),
   ];
 }

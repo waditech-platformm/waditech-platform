@@ -6,16 +6,16 @@ export type Course = {
   title_en: string; title_ar: string; summary_en: string | null; summary_ar: string | null;
   description_en: string | null; description_ar: string | null;
   category: string; level: string; delivery_mode: string; availability: string;
-  age_min: number | null; age_max: number | null; duration_weeks: number | null; hours_total: number | null;
+  age_min: number | null; age_max: number | null; grade_min: number | null; grade_max: number | null; duration_weeks: number | null; hours_total: number | null;
   price_amount: number; currency: string; capacity: number | null; requires_approval: boolean;
   thumbnail_url: string | null; cover_url: string | null; preview_video_url: string | null;
   outcomes_en: string[]; outcomes_ar: string[]; requirements_en: string[]; requirements_ar: string[];
   faqs: { q_en: string; q_ar: string; a_en: string; a_ar: string }[];
   featured: boolean; status: string; is_test_data: boolean;
 };
-const COURSE_COLS = "id, slug, program_id, title_en, title_ar, summary_en, summary_ar, description_en, description_ar, category, level, delivery_mode, availability, age_min, age_max, duration_weeks, hours_total, price_amount, currency, capacity, requires_approval, thumbnail_url, cover_url, preview_video_url, outcomes_en, outcomes_ar, requirements_en, requirements_ar, faqs, featured, status, is_test_data";
+const COURSE_COLS = "id, slug, program_id, title_en, title_ar, summary_en, summary_ar, description_en, description_ar, category, level, delivery_mode, availability, age_min, age_max, grade_min, grade_max, duration_weeks, hours_total, price_amount, currency, capacity, requires_approval, thumbnail_url, cover_url, preview_video_url, outcomes_en, outcomes_ar, requirements_en, requirements_ar, faqs, featured, status, is_test_data";
 
-export type CourseFilters = { category?: string; level?: string; mode?: string; availability?: string; age?: number; q?: string };
+export type CourseFilters = { category?: string; level?: string; mode?: string; availability?: string; age?: number; grade?: number; q?: string };
 
 export async function listCourses(f: CourseFilters = {}) {
   const supabase = await createClient();
@@ -25,6 +25,7 @@ export async function listCourses(f: CourseFilters = {}) {
   if (f.mode) q = q.eq("delivery_mode", f.mode);
   if (f.availability) q = q.eq("availability", f.availability);
   if (f.age) q = q.lte("age_min", f.age).gte("age_max", f.age);
+  if (f.grade) q = q.lte("grade_min", f.grade).gte("grade_max", f.grade);
   if (f.q) {
     const s = f.q.replace(/[%,()]/g, " ").slice(0, 60);
     q = q.or(`title_en.ilike.%${s}%,title_ar.ilike.%${s}%,summary_en.ilike.%${s}%,summary_ar.ilike.%${s}%`);
