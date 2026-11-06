@@ -68,3 +68,9 @@ Factual record for the frontend redesign. No agent is listed as used unless it w
   - footer: 160 px
   - homepage hero: 112–144 px, above the headline
   - certificates and favicon
+
+## Stage 6c — new official logo (6 Nov 2026)
+
+- The owner supplied a new official logo (1536×1024, glowing wide version) and asked for it "as it is, without highlight". When asked, the owner chose: adopt the new image exactly as supplied, with no frame, shadow or rounding around it.
+- `logo-original.png` was replaced byte-for-byte; the only derived files are resized copies (960 and 480 wide) and square favicons padded with transparency (the supplied PNG is itself transparent, so on white it shows without the glow).
+- All placements updated: header, footer, homepage hero, credentials card, About, certificates and favicon. The previous square logo files were removed from use (they remain in git history).

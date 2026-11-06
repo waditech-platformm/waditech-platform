@@ -79,7 +79,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
       <section className="bg-white">
         <Container className="grid grid-cols-1 items-center gap-12 pb-16 pt-12 [&>*]:min-w-0 sm:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pb-24 lg:pt-20">
           <div>
-            <Image src="/media/brand/logo-original-512.png" alt={d.meta.fullName} width={256} height={256} priority className="wt-rise mb-8 size-32 rounded-3xl shadow-[0_18px_40px_-18px_rgb(4_18_40/0.55)] sm:size-44" />
+            <Image src="/media/brand/logo-original-960.png" alt={d.meta.fullName} width={960} height={640} priority className="wt-rise mb-8 h-auto w-60 sm:w-80" />
             <p className="wt-rise text-sm font-semibold text-royal-600">{h.heroEyebrow}</p>
             <h1 className="wt-rise mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-navy-900 sm:text-5xl lg:text-[3.6rem]" style={{ "--i": 1 } as React.CSSProperties}>{h.heroTitle}</h1>
             <p className="wt-rise mt-4 text-xl font-semibold text-cyan-600 sm:text-2xl" style={{ "--i": 2 } as React.CSSProperties}>{h.heroSubtitle}</p>
@@ -224,15 +224,15 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
       <section className="bg-white py-20 sm:py-28">
         <Container className="grid grid-cols-1 items-center gap-12 [&>*]:min-w-0 lg:grid-cols-2 lg:gap-20">
           <div className="lg:order-2">
-            <div className="mx-auto max-w-md rounded-[28px] bg-navy-950 p-8 text-white ring-1 ring-navy-900 sm:p-10">
+            <div className="mx-auto max-w-md rounded-[28px] bg-surface p-8 text-navy-900 ring-1 ring-line sm:p-10">
               <div className="flex items-center gap-4">
-                <Image src="/media/brand/logo-original.png" alt={d.meta.fullName} width={128} height={128} className="size-16 rounded-xl" />
+                <Image src="/media/brand/logo-original-480.png" alt={d.meta.fullName} width={480} height={320} className="h-16 w-auto" />
                 <p className="text-lg font-bold">{h.credCardTitle}</p>
               </div>
               <ul className="mt-8 space-y-4">
                 {[[BadgeCheck, h.credCard1], [QrCode, h.credCard2], [School, h.credCard3]].map(([I, t]) => {
                   const Icon = I as typeof BadgeCheck;
-                  return <li key={t as string} className="flex items-center gap-3 border-t border-white/10 pt-4 text-white/85"><Icon className="size-5 text-cyan-300" aria-hidden />{t as string}</li>;
+                  return <li key={t as string} className="flex items-center gap-3 border-t border-line pt-4 text-navy-900"><Icon className="size-5 text-royal-600" aria-hidden />{t as string}</li>;
                 })}
               </ul>
             </div>

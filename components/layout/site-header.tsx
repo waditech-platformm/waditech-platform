@@ -15,7 +15,7 @@ export function Logo({ locale, dict, compact }: { locale: Locale; dict: Dict; co
   return (
     <Link href={`/${locale}`} className="flex items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label={dict.meta.fullName}>
       {/* Official logo, the full supplied image, unaltered. */}
-      <Image src="/media/brand/logo-original-192.png" alt={dict.meta.fullName} width={128} height={128} priority className={`${compact ? "size-14" : "size-16"} rounded-xl`} />
+      <Image src="/media/brand/logo-original-480.png" alt={dict.meta.fullName} width={480} height={320} priority className={`${compact ? "h-12" : "h-14"} w-auto`} />
     </Link>
   );
 }

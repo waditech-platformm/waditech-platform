@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Pr
     applicationName: d.meta.siteName,
     alternates: { canonical: `/${l}`, languages: { en: "/en", ar: "/ar", "x-default": "/en" } },
     openGraph: { type: "website", siteName: d.meta.siteName, locale: l === "ar" ? "ar_JO" : "en_JO", images: ["/media/brand/lab-entrance.webp"] },
-    icons: { icon: "/media/brand/logo-original-192.png", apple: "/media/brand/logo-original-512.png" },
+    icons: { icon: "/media/brand/logo-icon-192.png", apple: "/media/brand/logo-icon-512.png" },
     // the development / staging build must never be indexed
     robots: env().APP_ENV === "production" ? undefined : { index: false, follow: false },
   };

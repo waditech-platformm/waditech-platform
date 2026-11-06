@@ -5,8 +5,9 @@ Distinctive WadiTech identity built from the official assets — not copied from
 ## Brand assets (supplied by the academy — used as-is, never redrawn)
 | File | Source | Used in |
 |---|---|---|
-| `public/media/brand/logo-original.png` | Official logo (glowing WT mark + robot head, "LEARN · BUILD · INNOVATE") | Homepage hero, About |
-| `logo-original-512.png`, `logo-original-192.png` | The full official logo, resized only (no crop, no recolour, no redraw). The owner asked on 6 Nov 2026 for the logo to appear exactly as supplied. | Header, footer, homepage hero, certificates, favicon |
+| `public/media/brand/logo-original.png` | Official logo, 1536×1024, supplied by the owner on 6 Nov 2026 (glowing WT mark + robot head, "LEARN · BUILD · INNOVATE"). Byte-for-byte as supplied. | Source file |
+| `logo-original-960.png`, `logo-original-480.png` | The full official logo, resized only. Displayed with no frame, shadow, rounded corners or glow added (owner request: "as it is"). | Header, footer, homepage hero, About, certificates |
+| `logo-icon-512.png`, `logo-icon-192.png` | Browser/app icon: the full logo centred on a transparent square, so it fits without cropping | Favicon, Apple touch icon |
 | `lab-entrance.webp` (+ `-md`) | Supplied image: WadiTech Kids Robotics Lab entrance | Homepage hero, Open Graph image, About |
 | `lab-classroom.webp` (+ `-md`) | Supplied image: lab coding stations | Homepage "Why WadiTech", sign-in/register panel, About |
 | `public/media/photos/*` (27 photos, 2 sizes) | Academy photos from the supplied WhatsApp archives (competitions, classroom, projects) | Program covers, Learning in Action, Gallery, Competitions |

@@ -12,26 +12,25 @@ export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dict }) {
     { title: dict.footer.support, links: [[p("/contact"), dict.nav.contact], [p("/verify"), dict.nav.verify], [p("/login"), dict.nav.login], [p("/register"), dict.nav.register]] },
   ];
   return (
-    <footer className="bg-navy-950 text-white/75">
+    <footer className="border-t border-line bg-surface text-muted">
       <Container className="grid grid-cols-2 gap-10 py-16 md:grid-cols-[1.6fr_repeat(3,1fr)]">
         <div className="col-span-2 md:col-span-1">
-          <Image src="/media/brand/logo-original-512.png" alt={dict.meta.fullName} width={160} height={160} className="size-40 rounded-2xl" />
+          <Image src="/media/brand/logo-original-480.png" alt={dict.meta.fullName} width={480} height={320} className="h-auto w-60" />
           <p className="mt-4 max-w-sm text-sm leading-relaxed">{dict.footer.about}</p>
-          <p className="mt-3 text-xs font-bold tracking-[0.25em] text-cyan-300 font-latin">LEARN · BUILD · INNOVATE</p>
         </div>
         {cols.map((c) => (
           <div key={c.title}>
-            <p className="mb-4 text-sm font-semibold text-white">{c.title}</p>
+            <p className="mb-4 text-sm font-semibold text-navy-900">{c.title}</p>
             <ul className="space-y-2.5 text-sm">
-              {c.links.map(([href, label]) => <li key={href}><Link href={href} className="transition-colors hover:text-white">{label}</Link></li>)}
+              {c.links.map(([href, label]) => <li key={href}><Link href={href} className="transition-colors hover:text-royal-700">{label}</Link></li>)}
             </ul>
           </div>
         ))}
       </Container>
-      <div className="border-t border-white/10">
+      <div className="border-t border-line">
         <Container className="flex flex-col gap-2 py-5 text-xs sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} {dict.meta.fullName}. {dict.footer.rights}</p>
-          <p className="flex gap-4"><span>{dict.footer.madeIn}</span><a href="https://waditech.co" className="hover:text-cyan-300 font-latin" rel="noopener">waditech.co</a></p>
+          <p className="flex gap-4"><span>{dict.footer.madeIn}</span><a href="https://waditech.co" className="hover:text-royal-700 font-latin" rel="noopener">waditech.co</a></p>
         </Container>
       </div>
     </footer>

@@ -21,8 +21,8 @@ export default async function About({ params }: PageProps<"/[locale]/about">) {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="relative col-span-2 aspect-[16/9] overflow-hidden rounded-3xl"><Image src="/media/brand/lab-entrance.webp" alt="" fill sizes="50vw" className="object-cover" /></div>
-          <div className="relative aspect-square overflow-hidden rounded-3xl bg-black"><Image src="/media/brand/logo-original.png" alt={d.meta.fullName} fill sizes="25vw" className="object-cover" /></div>
-          <div className="relative aspect-square overflow-hidden rounded-3xl"><Image src="/media/brand/lab-classroom-md.webp" alt="" fill sizes="25vw" className="object-cover" /></div>
+          <div className="relative aspect-[3/2] bg-black"><Image src="/media/brand/logo-original-960.png" alt={d.meta.fullName} fill sizes="(min-width:1024px) 33vw, 100vw" className="object-contain" /></div>
+          <div className="relative aspect-[3/2] overflow-hidden rounded-3xl"><Image src="/media/brand/lab-classroom-md.webp" alt="" fill sizes="25vw" className="object-cover" /></div>
         </div>
       </Container>
     </>
