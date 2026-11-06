@@ -33,3 +33,21 @@ Factual record for the frontend redesign. No agent is listed as used unless it w
 - Found and removed two derived files that misrepresented it: `logo-square.png` (zoomed crop that cut the wordmark) and `logo-mark*.png` (background removal had turned the robot face white). Added `logo-official.png` (+512/192), a pure crop of the dark margin with the mark untouched. It is now used in the header (with no re-typeset "WADITECH ACADEMY" text), the footer, certificates and the favicon. The header is taller (72/80 px) so the logo reads.
 - Colour tokens now come from the logo: cyan `#00C6E0`, azure `#0089EB`, navy `#041228`/`#0A1A36`. AA-safe darker steps of the same hues are used for text and buttons (`#006BBD`, `#005A9E`, `#00869A`). The announcement bar moved to `royal-700` after axe flagged its badge.
 - Verified (run): build OK; unit 59/59; DB 25/25; Playwright 46/46 including axe on 10 pages in EN/AR.
+
+## Stage 5 — calmer homepage modelled on the owner's own design (6 Nov 2026)
+
+- **Brief:** the owner found the homepage too busy and pointed to their own page (waditech.ashraf123458.chatgpt.site) as the model, with Microsoft 365's marketing site as the quality bar (Microsoft's page could not be fetched by the tools, so its well-known patterns were used: white translucent header, one idea per section, alternating text/image rows, generous whitespace).
+- **Homepage, 9 sections:**
+  1. Hero: real facts computed from the database (tracks, age range, labs) and an accessible slideshow of real photos with pause/play and numbered buttons; no autoplay under reduced motion.
+  2. "Find your direction": one card per track that has published programs, with real program counts, linked to `/programs?category=`.
+  3. For schools: 3 cards.
+  4. Learning journey: 6 steps.
+  5. Interactive labs: dark cards from the CMS.
+  6. Competitions: split row.
+  7. Credentials: split row; certificate number and QR verification are real features.
+  8. Gallery.
+  9. Final call to action.
+- **Removed:** the program finder, annotated lab figure, trust strip, filmstrip/bento, parents panel and news/events.
+- **Header and footer:** white header; primary nav cut to Programs, Schools, Labs, Competitions, About + More. Footer reorganised; no links to pages that don't exist (privacy/terms pages are still missing).
+- **Content rule:** the "Future Makers" pathway and its figures from the owner's page were **not** added, because no such program exists in the database yet. Add it as a real program first.
+- **Verified (run):** build OK; lint 0 errors; unit 59/59; DB 25/25; Playwright 47/47 (new tests: track cards → filtered programs with matching counts; slideshow pause and number navigation); axe clean on 10 pages; no overflow at 360/390/1440 in EN/AR. The local DB was reset before the run because repeated runs had filled a test course to capacity.

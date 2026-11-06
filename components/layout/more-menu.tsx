@@ -20,7 +20,7 @@ export function MoreMenu({ label, links }: { label: string; links: { href: strin
   return (
     <div ref={ref} className="relative" onBlur={(e) => { if (!ref.current?.contains(e.relatedTarget as Node)) setOpen(false); }}>
       <button ref={btn} type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-white/85 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+        className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-[15px] font-medium text-navy-900/80 transition-colors hover:bg-surface hover:text-navy-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-500">
         {label}<ChevronDown aria-hidden className={`size-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       <div id={id} hidden={!open} className="absolute end-0 top-full z-50 mt-2 w-60 rounded-2xl bg-white p-2 shadow-[var(--shadow-lift)] ring-1 ring-line">

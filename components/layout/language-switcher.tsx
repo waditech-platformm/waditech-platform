@@ -19,7 +19,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
       prefetch={false}
       lang={target}
       aria-label={`${dict.common.language} — ${dict.common.languageLabel}`}
-      className={cn("inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-white/90 ring-1 ring-white/20 hover:bg-white/10", className)}
+      className={cn("inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-navy-900 ring-1 ring-line hover:bg-surface", className)}
     >
       <Languages className="size-4" aria-hidden />
       <span className={target === "en" ? "font-latin" : ""}>{dict.common.language}</span>

@@ -1,26 +1,25 @@
 import { expect, test } from "@playwright/test";
 
-test("program finder filters real programs by age and track, with and without JavaScript", async ({ page, browser }) => {
+test("track cards link to filtered programs and show real counts", async ({ page }) => {
   await page.goto("/en");
-  const finder = page.locator("#finder");
-  const count = finder.locator('[aria-live="polite"]');
-  const total = Number((await count.textContent())?.match(/\d+/)?.[0]);
-  expect(total).toBeGreaterThan(3);
+  const robotics = page.getByRole("link", { name: /^01\s*Robotics/ });
+  await expect(robotics).toHaveAttribute("href", "/en/programs?category=robotics");
+  const shown = Number((await robotics.textContent())?.match(/(\d+) programs?/)?.[1]);
+  await robotics.click();
+  await expect(page).toHaveURL(/category=robotics/);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const cards = page.locator('a[href^="/en/programs/"]');
+  await expect(cards.first()).toBeVisible();
+  expect(new Set(await cards.evaluateAll((a) => a.map((x) => x.getAttribute("href")))).size).toBe(shown);
+});
 
-  await finder.getByRole("link", { name: "Robotics", exact: true }).click();
-  await expect(page).toHaveURL(/track=robotics/);
-  const robotics = Number((await count.textContent())?.match(/\d+/)?.[0] ?? 0);
-  expect(robotics).toBeGreaterThan(0);
-  expect(robotics).toBeLessThan(total);
-  for (const meta of await finder.locator("li").allTextContents()) expect(meta).toContain("Robotics");
-  await expect(finder.getByRole("link", { name: "See matching programs" })).toHaveAttribute("href", "/en/programs?category=robotics");
-
-  // the same URL works server-side (progressive enhancement)
-  const noJs = await browser.newContext({ javaScriptEnabled: false });
-  const p2 = await noJs.newPage();
-  await p2.goto(page.url());
-  await expect(p2.locator('#finder [aria-live="polite"]')).toHaveText(await count.textContent() ?? "");
-  await noJs.close();
+test("hero slideshow can be paused and navigated by number", async ({ page }) => {
+  await page.goto("/en");
+  const region = page.getByRole("region", { name: "Photos from WadiTech" });
+  await region.getByRole("button", { name: "Pause slideshow" }).click();
+  await expect(region.getByRole("button", { name: "Play slideshow" })).toBeVisible();
+  await region.getByRole("button", { name: "Show photo 02" }).click();
+  await expect(region.getByRole("button", { name: "Show photo 02" })).toHaveAttribute("aria-current", "true");
 });
 
 test("More menu is a keyboard-operable disclosure", async ({ page }) => {
