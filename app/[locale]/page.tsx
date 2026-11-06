@@ -79,6 +79,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
       <section className="bg-white">
         <Container className="grid grid-cols-1 items-center gap-12 pb-16 pt-12 [&>*]:min-w-0 sm:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pb-24 lg:pt-20">
           <div>
+            <Image src="/media/brand/logo-original-512.png" alt={d.meta.fullName} width={256} height={256} priority className="wt-rise mb-8 size-32 rounded-3xl shadow-[0_18px_40px_-18px_rgb(4_18_40/0.55)] sm:size-44" />
             <p className="wt-rise text-sm font-semibold text-royal-600">{h.heroEyebrow}</p>
             <h1 className="wt-rise mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-navy-900 sm:text-5xl lg:text-[3.6rem]" style={{ "--i": 1 } as React.CSSProperties}>{h.heroTitle}</h1>
             <p className="wt-rise mt-4 text-xl font-semibold text-cyan-600 sm:text-2xl" style={{ "--i": 2 } as React.CSSProperties}>{h.heroSubtitle}</p>

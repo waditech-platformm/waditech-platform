@@ -14,8 +14,8 @@ import { signOutAction } from "@/features/identity/actions";
 export function Logo({ locale, dict, compact }: { locale: Locale; dict: Dict; compact?: boolean }) {
   return (
     <Link href={`/${locale}`} className="flex items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label={dict.meta.fullName}>
-      {/* Official logo, unaltered (background margin trimmed only). */}
-      <Image src="/media/brand/logo-official-192.png" alt={dict.meta.fullName} width={96} height={96} priority className={`${compact ? "size-12" : "size-12 lg:size-14"} rounded-xl`} />
+      {/* Official logo, the full supplied image, unaltered. */}
+      <Image src="/media/brand/logo-original-192.png" alt={dict.meta.fullName} width={128} height={128} priority className={`${compact ? "size-14" : "size-16"} rounded-xl`} />
     </Link>
   );
 }
@@ -57,7 +57,7 @@ export function SiteHeader({ locale, dict, viewer, unread }: { locale: Locale; d
   );
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
-      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Logo locale={locale} dict={dict} />
         <nav aria-label={dict.nav.mainNav} className="hidden items-center gap-1 lg:flex">
           {primary.map((l) => (

@@ -34,7 +34,7 @@ export default async function CertificatePage({ params }: PageProps<"/[locale]/c
           <div className="bg-neural absolute inset-x-[10mm] top-[10mm] h-[34mm]" />
           <div className="relative flex h-full flex-col items-center px-[28mm] pt-[16mm] text-center">
             <div className="flex w-full items-center justify-between text-white">
-              <Image src="/media/brand/logo-official-512.png" alt="WadiTech Academy" width={120} height={120} className="h-[26mm] w-auto rounded-lg" />
+              <Image src="/media/brand/logo-original-512.png" alt="WadiTech Academy" width={120} height={120} className="h-[26mm] w-auto rounded-lg" />
               <div className="text-end"><p className="font-latin text-[11px] font-bold tracking-[0.3em] text-cyan-300">LEARN · BUILD · INNOVATE</p><p className="text-sm font-semibold">{d.meta.fullName}</p></div>
             </div>
             <h1 className="mt-[14mm] text-[30px] font-extrabold tracking-tight text-navy-900">{d.certificates.title}</h1>

@@ -59,3 +59,12 @@ Factual record for the frontend redesign. No agent is listed as used unless it w
 - **Content rules:** no invented trainers, reviews or resources. Seed rows are flagged `is_test_data` and marked "[Demo]". Testimonials render only from approved, featured, verified reviews.
 - **Verified (run, local):** build OK; lint 0 errors; unit 69/69 (run with `npm test`); DB 35/35; Playwright 57/57. No overflow at 390 and 1440 px.
 - **Pending:** owner approval to apply the migration to the staging database, then merge to `main`.
+
+## Stage 6b — official logo shown exactly as supplied (6 Nov 2026)
+
+- The owner re-sent the official logo (pixel-identical to `logo-original.png`) and asked that it appear on the site as it is.
+- The margin-trimmed `logo-official*` files were removed. Every placement now uses the full image, resized only:
+  - header: 64 px, with the header raised to 80 px
+  - footer: 160 px
+  - homepage hero: 112–144 px, above the headline
+  - certificates and favicon
