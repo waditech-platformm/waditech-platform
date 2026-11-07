@@ -53,7 +53,7 @@ export async function proxy(req: NextRequest) {
     url.search = `?next=${encodeURIComponent(pathname + search)}`;
     return NextResponse.redirect(url);
   }
-  // Remember the language only for real navigations — a background prefetch of the language
+  // Remember the language only for real navigations: a background prefetch of the language
   // switcher link must not silently flip the visitor's language.
   const isPrefetch =
     req.headers.has("next-router-prefetch") || req.headers.get("purpose") === "prefetch" || /prefetch/i.test(req.headers.get("sec-purpose") ?? "");
@@ -81,7 +81,8 @@ function contentSecurityPolicy(nonce: string) {
     `media-src 'self' blob: ${supabase.split(" ")[0] ?? ""}`.trim(),
     "font-src 'self' data:",
     `connect-src 'self' ${supabase} ${hyperpay}`.trim(),
-    `frame-src ${hyperpay}`,
+    // Google Maps embed in the footer (loaded only after the visitor clicks "Show map")
+    `frame-src ${hyperpay} https://www.google.com`,
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",

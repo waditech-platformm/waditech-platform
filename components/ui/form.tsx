@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 
 const base =
-  "w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-subtle shadow-sm transition focus:border-royal-500 focus:outline-none focus:ring-4 focus:ring-royal-100 disabled:bg-surface aria-[invalid=true]:border-danger";
+  "w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-sm text-ink placeholder:text-subtle shadow-sm transition focus:border-royal-500 focus:outline-none focus:ring-4 focus:ring-royal-100 disabled:bg-surface aria-[invalid=true]:border-danger";
 
 export function Label({ className, ...p }: React.LabelHTMLAttributes<HTMLLabelElement>) {
   return <label className={cn("mb-1.5 block text-sm font-semibold text-navy-900", className)} {...p} />;

@@ -62,8 +62,8 @@ export function env(): Env {
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     // Logged server-side only (visible in the hosting provider's runtime logs); never sent to browsers.
-    console.error(`[env] Invalid environment configuration — ${issues}`);
-    throw new Error(`Invalid environment configuration — ${issues}. See .env.example`);
+    console.error(`[env] Invalid environment configuration: ${issues}`);
+    throw new Error(`Invalid environment configuration: ${issues}. See .env.example`);
   }
   if (parsed.data.APP_ENV === "production" && parsed.data.PAYMENTS_PROVIDER === "sandbox") {
     console.warn("[env] production is running with the sandbox payment provider");

@@ -28,7 +28,7 @@ export function QuizForm({ attemptId, questions }: { attemptId: string; question
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="attempt_id" value={attemptId} />
       {questions.map((q, i) => (
-        <fieldset key={q.id} className="rounded-2xl bg-white p-5 ring-1 ring-line">
+        <fieldset key={q.id} className="rounded-2xl bg-paper p-5 ring-1 ring-line">
           <input type="hidden" name="question_ids" value={q.id} />
           <legend className="sr-only">{i + 1}</legend>
           <p className="font-semibold text-navy-900"><span className="me-2 text-royal-600">{i + 1}.</span>{pick(q, "prompt", locale)} <span className="text-xs font-normal text-subtle">({q.points} {d.quiz.points})</span></p>

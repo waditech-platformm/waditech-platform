@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
 
 /**
- * SERVICE-ROLE client — bypasses RLS. Use ONLY in server code for operations that must not
+ * SERVICE-ROLE client: bypasses RLS. Use ONLY in server code for operations that must not
  * be performed by the end user directly (payment verification, rate limiting, validated public inserts).
  * Never import from a Client Component.
  */

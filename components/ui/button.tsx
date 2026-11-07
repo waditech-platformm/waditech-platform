@@ -2,9 +2,9 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 const variants = {
-  primary: "bg-royal-600 text-white hover:bg-royal-700 shadow-sm",
+  primary: "bg-action text-white hover:bg-action-hover shadow-sm",
   accent: "bg-cyan-500 text-navy-950 hover:bg-cyan-300",
-  secondary: "bg-white text-navy-900 ring-1 ring-line hover:ring-royal-500 hover:text-royal-700",
+  secondary: "bg-paper text-navy-900 ring-1 ring-line hover:ring-royal-500 hover:text-royal-700",
   ghost: "text-navy-900 hover:bg-royal-50",
   onDark: "bg-white/10 text-white ring-1 ring-white/25 hover:bg-white/20",
   danger: "bg-danger text-white hover:opacity-90",

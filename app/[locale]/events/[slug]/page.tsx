@@ -33,7 +33,7 @@ export default async function EventPage({ params }: PageProps<"/[locale]/events/
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
-      <section className="border-b border-line bg-white">
+      <section className="border-b border-line bg-paper">
         <Container className="grid grid-cols-1 items-center gap-10 py-12 [&>*]:min-w-0 lg:grid-cols-[1.2fr_1fr] lg:py-16">
           <div>
             <Link href={`/${locale}/events`} className="text-sm text-subtle hover:text-royal-600">← {d.events.title}</Link>

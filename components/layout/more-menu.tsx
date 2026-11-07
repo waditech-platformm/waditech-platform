@@ -23,7 +23,7 @@ export function MoreMenu({ label, links }: { label: string; links: { href: strin
         className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-[15px] font-medium text-navy-900/80 transition-colors hover:bg-surface hover:text-navy-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-500">
         {label}<ChevronDown aria-hidden className={`size-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
-      <div id={id} hidden={!open} className="absolute end-0 top-full z-50 mt-2 w-60 rounded-2xl bg-white p-2 shadow-[var(--shadow-lift)] ring-1 ring-line">
+      <div id={id} hidden={!open} className="absolute end-0 top-full z-50 mt-2 w-60 rounded-2xl bg-paper p-2 shadow-[var(--shadow-lift)] ring-1 ring-line">
         <ul>
           {links.map((l) => (
             <li key={l.href}><Link href={l.href} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium text-navy-900 hover:bg-royal-50 focus-visible:bg-royal-50 focus-visible:outline-none">{l.label}</Link></li>

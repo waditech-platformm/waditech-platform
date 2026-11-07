@@ -171,6 +171,30 @@ describe("school coordinators (tenant isolation)", () => {
       expect(await count(q, "select count(*) n from enrollments where student_id=$1", [U.sara])).toBe(0);
       expect(await count(q, "select count(*) n from organizations where slug='second-demo-school'")).toBe(0);
     }));
+  it("can edit their school but cannot list it publicly (admin decision)", () =>
+    as(U.coordinator, async (q) => {
+      await q("update organizations set city='Amman' where slug='demo-model-school'");
+      const msg = await refused(q, "update organizations set show_publicly = not show_publicly where slug='demo-model-school'");
+      expect(msg).toMatch(/only administrators/);
+    }));
+});
+
+describe("public partner schools (0011)", () => {
+  it("anon sees only listed, active schools and only name/city/type fields", () =>
+    as("anon", async (q) => {
+      const r = await q("select * from public_partner_schools()");
+      expect(r.rows.length).toBeGreaterThan(0);
+      const cols = Object.keys(r.rows[0]);
+      for (const c of ["contact_email", "contact_phone", "status"]) expect(cols).not.toContain(c);
+      expect(await count(q, "select count(*) n from organizations")).toBe(0); // the table itself stays private
+    }));
+  it("an unlisted school disappears from the public list", () =>
+    as(U.admin, async (q) => {
+      const before = (await q("select count(*) n from public_partner_schools()")).rows[0].n;
+      await q("update organizations set show_publicly=false where slug='second-demo-school'");
+      const after = (await q("select count(*) n from public_partner_schools()")).rows[0].n;
+      expect(Number(after)).toBe(Number(before) - 1);
+    }));
 });
 
 describe("trainers", () => {

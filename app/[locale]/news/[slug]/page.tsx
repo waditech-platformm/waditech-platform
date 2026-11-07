@@ -33,7 +33,7 @@ export default async function Article({ params }: PageProps<"/[locale]/news/[slu
       </Container>
       {a.cover_url && <Container className="max-w-5xl"><div className="relative aspect-[16/8] overflow-hidden rounded-3xl"><Image src={a.cover_url} alt="" fill priority sizes="(min-width:1024px) 1024px, 100vw" className="object-cover" /></div></Container>}
       <Container className="max-w-3xl py-10"><Markdown source={pick(a, "body", locale)} className="text-[17px]" /></Container>
-      {more.length > 0 && <section className="bg-white py-12"><Container><h2 className="mb-6 text-xl font-bold text-navy-900">{d.news.related}</h2><div className="grid gap-6 sm:grid-cols-3">{more.map((x) => <NewsCard key={x.id} a={x} locale={locale} d={d} />)}</div></Container></section>}
+      {more.length > 0 && <section className="bg-paper py-12"><Container><h2 className="mb-6 text-xl font-bold text-navy-900">{d.news.related}</h2><div className="wt-stagger grid gap-6 sm:grid-cols-3">{more.map((x) => <NewsCard key={x.id} a={x} locale={locale} d={d} />)}</div></Container></section>}
     </article>
   );
 }

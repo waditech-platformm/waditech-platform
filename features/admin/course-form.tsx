@@ -13,7 +13,7 @@ export function CourseForm({ d, c, programs }: { d: Dict; c?: Partial<Course> & 
       <TextField name="title_en" label={a.titleEn} defaultValue={c?.title_en} required dir="ltr" />
       <TextField name="title_ar" label={a.titleAr} defaultValue={c?.title_ar} required dir="rtl" />
       <TextField name="slug" label={a.slug} defaultValue={c?.slug} required dir="ltr" placeholder="robotics-foundations" />
-      <SelectField name="program_id" label={a.programs} defaultValue={c?.program_id ?? ""} options={[["", "—"], ...programs.map((p) => [p.id, p.title_en] as [string, string])]} />
+      <SelectField name="program_id" label={a.programs} defaultValue={c?.program_id ?? ""} options={[["", "-"], ...programs.map((p) => [p.id, p.title_en] as [string, string])]} />
       <AreaField name="summary_en" label={a.summaryEn} defaultValue={c?.summary_en} rows={2} dir="ltr" />
       <AreaField name="summary_ar" label={a.summaryAr} defaultValue={c?.summary_ar} rows={2} dir="rtl" />
       <AreaField name="description_en" label={a.descriptionEn} defaultValue={c?.description_en} dir="ltr" />

@@ -15,10 +15,10 @@ export default async function Labs({ params }: PageProps<"/[locale]/labs">) {
   return (
     <>
       <PageHeader title={d.labs.title} subtitle={d.labs.subtitle} />
-      <section className="bg-navy-900 py-10"><Container className="space-y-10">
+      <section className="bg-deep-900 py-10"><Container className="space-y-10">
         {cats.map((c) => (
           <div key={c}><h2 className="mb-4 text-lg font-bold text-white">{d.enums.labCategory[c as keyof typeof d.enums.labCategory]}</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{labs.filter((x) => x.category === c).map((x) => <LabCard key={x.id} l={x} locale={locale} d={d} />)}</div></div>
+            <div className="wt-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{labs.filter((x) => x.category === c).map((x) => <LabCard key={x.id} l={x} locale={locale} d={d} />)}</div></div>
         ))}
       </Container></section>
     </>

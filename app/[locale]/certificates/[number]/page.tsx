@@ -45,7 +45,7 @@ export default async function CertificatePage({ params }: PageProps<"/[locale]/c
             <p className="mt-2 text-[22px] font-bold text-navy-900">{locale === "ar" ? c.course_title_ar : c.course_title_en}</p>
             {c.hours_total && <p className="mt-1 text-sm text-muted">{c.hours_total} {d.certificates.hours}</p>}
             {revoked && <p className="mt-3 rounded-full bg-danger-bg px-4 py-1 text-sm font-bold text-danger">{d.certificates.revoked}</p>}
-            {c.is_test_data && <p className="mt-2 text-xs font-bold uppercase tracking-wide text-warning">{d.common.demoBadge} — not a real certificate</p>}
+            {c.is_test_data && <p className="mt-2 text-xs font-bold uppercase tracking-wide text-warning">{d.common.demoBadge}: not a real certificate</p>}
             <div className="mt-auto mb-[20mm] grid w-full grid-cols-3 items-end text-xs text-muted">
               <div className="text-start"><p className="font-semibold text-navy-900">{d.certificates.date}</p><p>{formatDate(c.completion_date, locale, { dateStyle: "long" })}</p><p className="mt-2 font-semibold text-navy-900">{d.certificates.number}</p><p className="font-latin">{c.certificate_number}</p></div>
               <div className="flex flex-col items-center"><div className="size-[24mm]" dangerouslySetInnerHTML={{ __html: qr }} /><p className="mt-1">{d.certificates.verifyAt}</p><p className="font-latin text-[10px]" dir="ltr">{env().NEXT_PUBLIC_SITE_URL.replace(/^https?:\/\//, "")}/verify</p></div>

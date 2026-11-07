@@ -25,8 +25,8 @@ export default async function ScholarshipPage({ params }: PageProps<"/[locale]/s
       <h1 className="mt-2 text-3xl font-extrabold text-navy-900">{pick(s, "title", locale)}</h1>
       <p className="mt-3 text-muted">{pick(s, "description", locale)}</p>
       <dl className="mt-6 grid gap-3 sm:grid-cols-2">
-        <Card className="p-4"><dt className="text-xs text-subtle">{d.scholarships.coverage}</dt><dd className="text-xl font-bold">{s.coverage_percent ?? "—"}%</dd></Card>
-        <Card className="p-4"><dt className="text-xs text-subtle">{d.scholarships.deadline}</dt><dd className="text-xl font-bold">{s.deadline ? formatDate(s.deadline, locale) : "—"}</dd></Card>
+        <Card className="p-4"><dt className="text-xs text-subtle">{d.scholarships.coverage}</dt><dd className="text-xl font-bold">{s.coverage_percent ?? "-"}%</dd></Card>
+        <Card className="p-4"><dt className="text-xs text-subtle">{d.scholarships.deadline}</dt><dd className="text-xl font-bold">{s.deadline ? formatDate(s.deadline, locale) : "-"}</dd></Card>
       </dl>
       {pick(s, "criteria", locale) && <Card className="mt-4 p-5"><p className="text-sm font-bold">{d.scholarships.criteria}</p><p className="mt-1 text-sm text-muted">{pick(s, "criteria", locale)}</p></Card>}
       <Card className="mt-6 p-6">

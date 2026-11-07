@@ -15,9 +15,9 @@ export default async function Projects({ params }: PageProps<"/[locale]/projects
     <>
       <PageHeader title={d.projects.title} subtitle={d.projects.subtitle} />
       <Container className="py-10">
-        {items.length === 0 ? <EmptyState title={d.projects.empty} /> : <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{items.map((p) => (
+        {items.length === 0 ? <EmptyState title={d.projects.empty} /> : <div className="wt-stagger grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{items.map((p) => (
           <Card key={p.id} className="overflow-hidden">
-            <div className="relative aspect-[4/3] bg-navy-900">{p.cover_url && <Image src={p.cover_url} alt="" fill sizes="33vw" className="object-cover" />}</div>
+            <div className="relative aspect-[4/3] bg-deep-900">{p.cover_url && <Image src={p.cover_url} alt="" fill sizes="33vw" className="object-cover" />}</div>
             <div className="p-5">
               <DemoBadge show={p.is_test_data} label={d.common.demoBadge} />
               <h2 className="mt-1 font-bold text-navy-900">{p.title}</h2>

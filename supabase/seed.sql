@@ -1,5 +1,5 @@
 -- =====================================================================
--- WadiTech Academy — DEVELOPMENT SEED (FICTIONAL TEST DATA ONLY)
+-- WadiTech Academy, DEVELOPMENT SEED (FICTIONAL TEST DATA ONLY)
 -- Every person, price, date, article and event below is invented for testing.
 -- Rows are flagged is_test_data = true and the UI shows a "Demo data" badge for them.
 -- NEVER load this file into production.
@@ -51,6 +51,11 @@ insert into public.user_roles(user_id, role) values
 insert into public.organizations(id, name, name_ar, slug, type, city, contact_email, is_test_data) values
   ('0a000000-0000-4000-a000-000000000001','Demo Model School (fictional)','مدرسة تجريبية (وهمية)','demo-model-school','school','Amman','office@demo-school.example', true),
   ('0a000000-0000-4000-a000-000000000002','Second Demo School (fictional)','مدرسة تجريبية ثانية (وهمية)','second-demo-school','school','Irbid','office@demo-school2.example', true);
+-- both demo schools are listed publicly (labelled as demo) so the Schools menu has something to show on staging
+-- (acting as the demo admin, because the 0011 guard lets only admins change public listing)
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a000-000000000002","role":"authenticated"}', true);
+update public.organizations set show_publicly = true where is_test_data;
+select set_config('request.jwt.claims', '', true);
 insert into public.organization_members(organization_id, user_id, member_role) values
   ('0a000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000008','coordinator'),
   ('0a000000-0000-4000-a000-000000000001','00000000-0000-4000-a000-000000000009','student'),
@@ -62,9 +67,9 @@ insert into public.parent_student_links(parent_id, student_id, status, verified_
 
 -- ---------- programs (tracks) ----------
 insert into public.programs(id, slug, title_en, title_ar, summary_en, summary_ar, category, position, status, is_test_data, cover_url) values
- ('0b000000-0000-4000-a000-000000000001','robotics-track','Robotics Track','مسار الروبوتات','Design, build and program robots — from first motors to competition-grade machines.','صمّم وابنِ وبرمج الروبوتات من أول محرك حتى روبوتات المسابقات.','robotics',1,'published',true,'/media/photos/projects-42.webp'),
+ ('0b000000-0000-4000-a000-000000000001','robotics-track','Robotics Track','مسار الروبوتات','Design, build and program robots, from first motors to competition-grade machines.','صمّم وابنِ وبرمج الروبوتات من أول محرك حتى روبوتات المسابقات.','robotics',1,'published',true,'/media/photos/projects-42.webp'),
  ('0b000000-0000-4000-a000-000000000002','ai-track','Artificial Intelligence Track','مسار الذكاء الاصطناعي','Understand how machines learn and build your first AI projects responsibly.','افهم كيف تتعلم الآلات وابنِ أول مشاريعك في الذكاء الاصطناعي بمسؤولية.','ai',2,'published',true,'/media/photos/classroom-52.webp'),
- ('0b000000-0000-4000-a000-000000000003','programming-track','Programming Track','مسار البرمجة','Python, C++ and the web — real code, real problem solving.','بايثون و++C والويب: كود حقيقي وحل مشكلات حقيقي.','programming',3,'published',true,'/media/photos/projects-51.webp'),
+ ('0b000000-0000-4000-a000-000000000003','programming-track','Programming Track','مسار البرمجة','Python, C++ and the web, real code, real problem solving.','بايثون و++C والويب: كود حقيقي وحل مشكلات حقيقي.','programming',3,'published',true,'/media/photos/projects-51.webp'),
  ('0b000000-0000-4000-a000-000000000004','makers-track','Electronics & Makers Track','مسار الإلكترونيات والصناعة','Arduino, IoT, drones and 3D printing for young makers.','أردوينو وإنترنت الأشياء والطائرات المسيّرة والطباعة ثلاثية الأبعاد.','electronics',4,'published',true,'/media/photos/projects-20.webp');
 
 -- ---------- courses ----------
@@ -73,7 +78,7 @@ insert into public.courses(id, program_id, slug, title_en, title_ar, summary_en,
  ('0c000000-0000-4000-a000-000000000001','0b000000-0000-4000-a000-000000000001','robotics-foundations',
   'Robotics Foundations','أساسيات الروبوتات',
   'Build and program your first robot with sensors, motors and logic.','ابنِ وبرمج أول روبوت لك باستخدام الحساسات والمحركات والمنطق.',
-  'A hands-on introduction to robotics. Students assemble a mobile robot, learn how sensors and motors work together, and program behaviours step by step — finishing with a mini challenge.',
+  'A hands-on introduction to robotics. Students assemble a mobile robot, learn how sensors and motors work together, and program behaviours step by step, finishing with a mini challenge.',
   'مقدمة عملية في الروبوتات: يجمّع الطلاب روبوتًا متحركًا، ويتعلمون كيف تعمل الحساسات والمحركات معًا، ويبرمجون سلوكياته خطوة بخطوة، وينتهي البرنامج بتحدٍّ صغير.',
   'robotics','beginner','in_person','open',9,13,8,24,0,'JOD',20,'/media/photos/projects-42-sm.webp','/media/photos/projects-42.webp','/media/videos/clip-4.mp4',
   array['Explain how sensors, controllers and actuators interact','Assemble and wire a mobile robot safely','Program sequences, loops and conditions','Debug a robot that does not behave as expected'],
@@ -84,7 +89,7 @@ insert into public.courses(id, program_id, slug, title_en, title_ar, summary_en,
  ('0c000000-0000-4000-a000-000000000002','0b000000-0000-4000-a000-000000000003','python-for-young-coders',
   'Python for Young Coders','بايثون للمبرمجين الصغار',
   'Learn real programming with Python through games, puzzles and mini projects.','تعلّم البرمجة الحقيقية ببايثون من خلال الألعاب والألغاز والمشاريع الصغيرة.',
-  'Students write real Python from day one: variables, decisions, loops, functions and lists — then combine them into small projects they can show.',
+  'Students write real Python from day one: variables, decisions, loops, functions and lists, then combine them into small projects they can show.',
   'يكتب الطلاب كود بايثون حقيقيًا من اليوم الأول: المتغيرات والقرارات والتكرار والدوال والقوائم، ثم يجمعونها في مشاريع صغيرة يعرضونها.',
   'programming','beginner','hybrid','open',11,16,10,30,85,'JOD',18,'/media/photos/projects-51-sm.webp','/media/photos/projects-51.webp',null,
   array['Write and run Python programs','Use variables, conditions and loops','Break problems into functions','Build and present a mini project'],
@@ -93,7 +98,7 @@ insert into public.courses(id, program_id, slug, title_en, title_ar, summary_en,
   '[]', true,'published',now(),true),
  ('0c000000-0000-4000-a000-000000000003','0b000000-0000-4000-a000-000000000002','ai-explorers',
   'AI Explorers','مستكشفو الذكاء الاصطناعي',
-  'Discover how AI sees, hears and decides — and train your own model.','اكتشف كيف يرى الذكاء الاصطناعي ويسمع ويقرر، ودرّب نموذجك الخاص.',
+  'Discover how AI sees, hears and decides, and train your own model.','اكتشف كيف يرى الذكاء الاصطناعي ويسمع ويقرر، ودرّب نموذجك الخاص.',
   'An age-appropriate introduction to machine learning: data, training, testing and fairness, using visual no-code tools before moving to simple Python.',
   'مقدمة مناسبة للعمر في تعلم الآلة: البيانات والتدريب والاختبار والعدالة، باستخدام أدوات مرئية بدون كود ثم بايثون بسيط.',
   'ai','beginner','in_person','open',12,17,6,18,95,'JOD',16,'/media/photos/classroom-52-sm.webp','/media/photos/classroom-52.webp',null,
@@ -103,7 +108,7 @@ insert into public.courses(id, program_id, slug, title_en, title_ar, summary_en,
   '[]', true,'published',now(),true),
  ('0c000000-0000-4000-a000-000000000004','0b000000-0000-4000-a000-000000000004','arduino-electronics',
   'Arduino & Electronics','أردوينو والإلكترونيات',
-  'Circuits, sensors and microcontrollers — simulate in Wokwi, then build for real.','الدوائر والحساسات والمتحكمات الدقيقة: محاكاة في Wokwi ثم بناء حقيقي.',
+  'Circuits, sensors and microcontrollers, simulate in Wokwi, then build for real.','الدوائر والحساسات والمتحكمات الدقيقة: محاكاة في Wokwi ثم بناء حقيقي.',
   'Students learn safe circuit building, read sensors and control outputs with Arduino, practising first in an online simulator.',
   'يتعلم الطلاب بناء الدوائر بأمان وقراءة الحساسات والتحكم بالمخرجات باستخدام أردوينو، مع التدريب أولًا على محاكٍ إلكتروني.',
   'electronics','intermediate','in_person','waitlist',12,18,8,24,110,'JOD',14,'/media/photos/projects-20-sm.webp','/media/photos/projects-20.webp',null,
@@ -111,7 +116,7 @@ insert into public.courses(id, program_id, slug, title_en, title_ar, summary_en,
   array['Robotics Foundations or equivalent'], array['أساسيات الروبوتات أو ما يعادلها'], '[]', false,'published',now(),true),
  ('0c000000-0000-4000-a000-000000000005','0b000000-0000-4000-a000-000000000004','drones-and-flight',
   'Drones & Flight Systems','الطائرات المسيّرة وأنظمة الطيران',
-  'How drones fly, stay stable and stay safe — with supervised practice.','كيف تطير الطائرات المسيّرة وتحافظ على توازنها وسلامتها، مع تدريب تحت الإشراف.',
+  'How drones fly, stay stable and stay safe, with supervised practice.','كيف تطير الطائرات المسيّرة وتحافظ على توازنها وسلامتها، مع تدريب تحت الإشراف.',
   'Physics of flight, flight controllers, safety rules and supervised simulator and indoor practice.',
   'فيزياء الطيران ووحدات التحكم وقواعد السلامة والتدريب على المحاكي وفي الأماكن المغلقة تحت الإشراف.',
   'drones','intermediate','in_person','coming_soon',14,18,6,18,150,'JOD',10,'/media/photos/projects-64-sm.webp','/media/photos/projects-64.webp',null,

@@ -43,7 +43,7 @@ export default async function TrainerCourse({ params, searchParams }: PageProps<
               const cert = certMap.get(r.id);
               return (
                 <tr key={r.id}>
-                  <Td className="font-semibold">{r.profiles?.full_name ?? "—"}</Td>
+                  <Td className="font-semibold">{r.profiles?.full_name ?? "-"}</Td>
                   <Td className="w-48"><ProgressBar value={pct} label={d.trainer.progress} /><span className="text-xs text-subtle">{pct}%</span></Td>
                   <Td><Badge tone={r.status === "completed" ? "success" : "blue"}>{d.enums.enrollment[r.status as keyof typeof d.enums.enrollment]}</Badge></Td>
                   <Td>
@@ -83,7 +83,7 @@ export default async function TrainerCourse({ params, searchParams }: PageProps<
                 <li key={r.student_id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                   <span className="font-semibold">{r.profiles?.full_name}</span>
                   <Select name={`s_${r.student_id}`} defaultValue={attMap.get(r.student_id) ?? ""} className="h-9 w-40" aria-label={`${d.trainer.attendance}: ${r.profiles?.full_name}`}>
-                    <option value="">—</option>{(["present", "late", "absent", "excused"] as const).map((s) => <option key={s} value={s}>{d.enums.attendance[s]}</option>)}
+                    <option value="">-</option>{(["present", "late", "absent", "excused"] as const).map((s) => <option key={s} value={s}>{d.enums.attendance[s]}</option>)}
                   </Select>
                 </li>
               ))}</ul>

@@ -42,7 +42,7 @@ export default async function LessonPage({ params }: PageProps<"/[locale]/learn/
   const next = ctx.lessons[idx + 1];
   const allDone = ctx.lessons.every((x) => ctx.progress.get(x.id)?.status === "completed");
   const ruleHelp = { video_90: d.learn.watchToComplete, quiz_pass: d.learn.passQuizToComplete, assignment_submitted: d.learn.submitToComplete, manual: d.learn.manualComplete, view: "" }[lesson.completion_rule] ?? "";
-  // the database re-checks the rule (e.g. 90% watched) — this only decides whether to show the button
+  // the database re-checks the rule (e.g. 90% watched): this only decides whether to show the button
   const canSelfComplete = enrolled && !complete && ["view", "video_90"].includes(lesson.completion_rule);
   const p = (s: string) => `/${locale}/learn/${slug}${s}`;
   const arrowS = <ArrowLeft className="size-4 rtl:-scale-x-100" aria-hidden />;
@@ -89,7 +89,7 @@ export default async function LessonPage({ params }: PageProps<"/[locale]/learn/
             </Card>
           )}
 
-          <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 ring-1 ring-line sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-2xl bg-paper p-4 ring-1 ring-line sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted">{!complete && ruleHelp}</div>
             <div className="flex flex-wrap gap-2">
               {prev && <ButtonLink href={p(`/${prev.id}`)} variant="secondary">{arrowS}{d.learn.prevLesson}</ButtonLink>}
@@ -105,7 +105,7 @@ export default async function LessonPage({ params }: PageProps<"/[locale]/learn/
           </div>
 
           {enrolled && (
-            <div className="grid gap-6 xl:grid-cols-2">
+            <div className="wt-stagger grid gap-6 xl:grid-cols-2">
               <Card className="p-5">
                 <h2 className="font-bold text-navy-900">{d.learn.notes}</h2>
                 <ActionForm action={saveNoteAction} resetOnSuccess className="mt-3 space-y-2">

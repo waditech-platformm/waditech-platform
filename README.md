@@ -1,6 +1,6 @@
 # WadiTech Academy Platform
 
-**WadiTech Academy for AI & Robotics** — LEARN · BUILD · INNOVATE
+**WadiTech Academy for AI & Robotics**: LEARN · BUILD · INNOVATE
 
 A new, separate, full-stack EdTech platform: public academy website, LMS, student / trainer / parent / school / admin portals, virtual labs, AI learning assistant, certificates with public verification, and a sandbox payment flow. English (default) and Arabic with full RTL.
 
@@ -36,7 +36,7 @@ npm run dev              # http://localhost:3000
 If you have Docker you can instead run the official Supabase CLI (`supabase start`) and `supabase db push`; the migrations are plain SQL compatible with both.
 
 **Demo accounts** (fictional, local only), password `Demo-Pass-2026!`:
-`superadmin@`, `admin@`, `trainer@`, `trainer2@`, `student@` (Omar), `student2@` (Sara), `student3@` (Yazan), `parent@` (linked to Omar), `parent2@` (unlinked), `coordinator@` — all `…@demo.waditech.local`.
+`superadmin@`, `admin@`, `trainer@`, `trainer2@`, `student@` (Omar), `student2@` (Sara), `student3@` (Yazan), `parent@` (linked to Omar), `parent2@` (unlinked), `coordinator@`: all `…@demo.waditech.local`.
 
 Emails sent by Supabase Auth in development (verification, password reset) are captured at `http://127.0.0.1:54321/__mail`.
 

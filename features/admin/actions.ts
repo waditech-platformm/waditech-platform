@@ -394,7 +394,7 @@ export async function deleteMediaAction(_: ActionResult | null, fd: FormData): P
 export async function refundOrderAction(_: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const { locale, supabase } = await ctx(fd);
   const amount = Number(fdString(fd, "amount"));
-  // NOTE: for live HyperPay orders the provider refund (paymentType=RF) must succeed first — see docs/PAYMENTS.md
+  // NOTE: for live HyperPay orders the provider refund (paymentType=RF) must succeed first: see docs/PAYMENTS.md
   const { error } = await supabase.rpc("mark_order_refunded", { p_order: fdString(fd, "id"), p_amount: amount, p_reference: fdOptional(fd, "reference") });
   return error ? { ok: false, error: dbError(error, locale) } : ok(locale);
 }
@@ -412,6 +412,16 @@ export async function saveOrganizationAction(_: ActionResult | null, fd: FormDat
   if (!parsed.success) return { ok: false, fieldErrors: zodErrors(parsed.error, locale) };
   const { error } = await supabase.from("organizations").insert(parsed.data);
   return error ? { ok: false, error: dbError(error, locale) } : ok(locale);
+}
+/** List / unlist a school on the public site (header "Schools" menu and /schools). Admin-only: enforced by RLS + trigger (0011). */
+export async function setOrgPublicAction(_: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const { locale, supabase } = await ctx(fd);
+  const id = uuid.safeParse(fdString(fd, "organization_id"));
+  if (!id.success) return { ok: false };
+  const { error } = await supabase.from("organizations").update({ show_publicly: bool(fd, "show_publicly") }).eq("id", id.data);
+  if (error) return { ok: false, error: dbError(error, locale) };
+  revalidatePath(`/${locale}`, "layout");
+  return ok(locale);
 }
 export async function addOrgMemberAction(_: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const { locale, supabase, d } = await ctx(fd);

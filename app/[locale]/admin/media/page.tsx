@@ -43,7 +43,7 @@ export default async function AdminMedia({ params, searchParams }: PageProps<"/[
         <Select name="category" defaultValue={cat ?? ""} className="w-56" aria-label={a.category}><option value="">{d.common.all}</option>{CATS.map((c) => <option key={c} value={c}>{d.gallery.categories[c]}</option>)}</Select>
         <SubmitButton variant="secondary">{d.common.filter}</SubmitButton>
       </form>
-      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="wt-stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((m) => (
           <li key={m.id}>
             <Card className="overflow-hidden">

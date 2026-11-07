@@ -19,19 +19,19 @@ export default async function AdminHome({ params }: PageProps<"/[locale]/admin">
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold text-navy-900">{d.admin.overview}</h1>
         <div className="flex gap-2"><ButtonLink href={`/${locale}/admin/courses/new`} size="sm">{d.admin.newCourse}</ButtonLink><ButtonLink href={`/${locale}/admin/news/new`} size="sm" variant="secondary">{d.admin.newArticle}</ButtonLink><ButtonLink href={`/${locale}/admin/events/new`} size="sm" variant="secondary">{d.admin.newEvent}</ButtonLink></div></div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="wt-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label={d.admin.totalStudents} value={o.students} />
         <Stat label={d.admin.activeEnrollments} value={o.active_enrollments} />
         <Stat label={d.admin.publishedCourses} value={o.published_courses} />
         <Stat label={d.admin.revenue} value={formatMoney(Number(o.paid_total_jod), "JOD", locale)} hint={`${o.paid_orders} · ${formatMoney(Number(o.paid_total_usd), "USD", locale)}`} />
       </div>
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="wt-stagger grid gap-6 lg:grid-cols-3">
         <Card className="p-5"><h2 className="font-bold text-navy-900">{d.admin.pendingItems}</h2>
           <ul className="mt-3 space-y-2 text-sm">{pend.map(([label, n, href]) => <li key={href}><Link href={`/${locale}/admin${href}`} className="flex justify-between rounded-lg px-2 py-1.5 hover:bg-surface"><span>{label}</span><span className={`font-bold ${n ? "text-warning" : "text-subtle"}`}>{n}</span></Link></li>)}</ul></Card>
         <Card className="p-5 lg:col-span-2"><h2 className="font-bold text-navy-900">{d.admin.enrollments} · {d.programs.category}</h2>
           <ul className="mt-4 space-y-3">{o.enrollments_by_category.map((x) => (
             <li key={x.category} className="grid grid-cols-[140px_1fr_40px] items-center gap-3 text-sm"><span className="truncate">{d.enums.category[x.category as keyof typeof d.enums.category]}</span>
-              <span className="h-3 rounded-full bg-royal-50"><span className="block h-3 rounded-full bg-royal-600" style={{ width: `${(x.n / max) * 100}%` }} /></span><span className="text-end font-semibold tabular-nums">{x.n}</span></li>
+              <span className="h-3 rounded-full bg-royal-50"><span className="block h-3 rounded-full bg-action" style={{ width: `${(x.n / max) * 100}%` }} /></span><span className="text-end font-semibold tabular-nums">{x.n}</span></li>
           ))}</ul></Card>
       </div>
       <section><h2 className="mb-3 font-bold text-navy-900">{d.admin.recentActivity}</h2>

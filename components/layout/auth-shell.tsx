@@ -12,7 +12,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
       </div>
       <div className="relative hidden lg:block">
         <Image src="/media/brand/lab-classroom.webp" alt="" fill sizes="50vw" className="object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-950/80 via-navy-900/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-deep-950/80 via-deep-900/20 to-transparent" />
         <p className="absolute bottom-10 start-10 font-latin text-sm font-bold tracking-[0.3em] text-cyan-300">LEARN · BUILD · INNOVATE</p>
       </div>
     </div>

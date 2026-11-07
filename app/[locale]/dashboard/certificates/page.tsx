@@ -14,7 +14,7 @@ export default async function MyCertificates({ params }: PageProps<"/[locale]/da
   return (
     <PortalShell title={d.dashboard.certificates} nav={dashboardNav(locale, d, viewer.roles)}>
       {(data ?? []).length === 0 ? <EmptyState title={d.dashboard.noCertificates} icon={<Award className="size-6" />} /> : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(data ?? []).map((c) => (
+        <div className="wt-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(data ?? []).map((c) => (
           <Card key={c.certificate_number} className="p-5">
             <div className="flex items-center justify-between"><Award className="size-7 text-royal-600" aria-hidden /><Badge tone={c.status === "valid" ? "success" : "danger"}>{c.status === "valid" ? d.certificates.valid : d.certificates.revoked}</Badge></div>
             <p className="mt-3 font-bold text-navy-900">{pick(c, "course_title", locale)}</p>

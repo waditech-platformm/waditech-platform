@@ -26,7 +26,7 @@ export default async function AdminUsers({ params, searchParams }: PageProps<"/[
         <Select name="role" defaultValue={role ?? ""} className="w-48" aria-label={d.admin.grantRole}><option value="">{d.common.all}</option>{ROLES.map((r) => <option key={r} value={r}>{d.enums.role[r]}</option>)}</Select><SubmitButton variant="secondary">{d.common.filter}</SubmitButton></form>
       <Table head={[d.common.name, d.common.email, "Roles", d.common.status, d.common.actions]}>{users.map((u) => (
         <tr key={u.id}>
-          <Td><p className="font-semibold">{u.full_name || "—"}</p><p className="text-xs text-subtle">{formatDate(u.created_at, locale)}</p><DemoBadge show={u.is_test_data} label={d.common.demoBadge} /></Td>
+          <Td><p className="font-semibold">{u.full_name || "-"}</p><p className="text-xs text-subtle">{formatDate(u.created_at, locale)}</p><DemoBadge show={u.is_test_data} label={d.common.demoBadge} /></Td>
           <Td className="font-latin text-xs" dir="ltr">{u.email}{!u.email_confirmed && <Badge tone="warning" className="ms-1">unverified</Badge>}</Td>
           <Td><div className="flex flex-wrap gap-1">{u.roles.map((r) => (
             <span key={r} className="inline-flex items-center gap-1 rounded-full bg-royal-50 px-2 py-0.5 text-xs font-semibold text-royal-700">{d.enums.role[r as keyof typeof d.enums.role]}

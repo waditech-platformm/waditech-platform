@@ -14,7 +14,7 @@ export function SectionHeading({ eyebrow, title, subtitle, action, className, on
     <div className={cn("mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="max-w-2xl">
         {eyebrow && <p className={cn("mb-2 text-sm font-semibold", onDark ? "text-cyan-300" : "text-royal-600")}>{eyebrow}</p>}
-        <h2 className={cn("text-3xl font-extrabold tracking-tight sm:text-4xl", onDark ? "text-white" : "text-navy-900")}>{title}</h2>
+        <h2 className={cn("wt-reveal text-3xl font-extrabold tracking-tight sm:text-4xl", onDark ? "text-white" : "text-navy-900")}>{title}</h2>
         {subtitle && <p className={cn("mt-3 text-lg", onDark ? "text-white/75" : "text-muted")}>{subtitle}</p>}
       </div>
       {action}
@@ -24,8 +24,9 @@ export function SectionHeading({ eyebrow, title, subtitle, action, className, on
 /** Page header for public pages: light, calm, large type (matches the homepage hero). */
 export function PageHeader({ title, subtitle, eyebrow, children }: { title: string; subtitle?: string; eyebrow?: string; children?: React.ReactNode }) {
   return (
-    <div className="relative overflow-hidden border-b border-line bg-white">
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_80%_at_85%_0%,rgb(0_198_224/0.10),transparent_70%),radial-gradient(45%_70%_at_5%_0%,rgb(0_137_235/0.07),transparent_70%)]" />
+    // translucent so the site-wide circuit layer (layout.tsx) runs behind the title too
+    <div className="relative isolate overflow-hidden border-b border-line bg-paper/60">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_80%_at_85%_0%,rgb(0_198_224/0.10),transparent_70%),radial-gradient(45%_70%_at_5%_0%,rgb(0_137_235/0.07),transparent_70%)]" />
       <Container className="relative py-12 sm:py-16 lg:py-20">
         {eyebrow && <p className="wt-rise mb-3 text-sm font-semibold text-royal-600">{eyebrow}</p>}
         <h1 className="wt-rise max-w-4xl text-4xl font-extrabold leading-[1.1] tracking-tight text-navy-900 sm:text-5xl" style={{ "--i": 1 } as React.CSSProperties}>{title}</h1>
@@ -39,11 +40,11 @@ export function PageHeader({ title, subtitle, eyebrow, children }: { title: stri
 const badgeTones = {
   neutral: "bg-surface text-muted ring-line",
   blue: "bg-royal-50 text-royal-700 ring-royal-100",
-  cyan: "bg-cyan-100 text-[#006b7a] ring-cyan-300/50",
+  cyan: "bg-cyan-100 text-cyan-ink ring-cyan-300/50",
   success: "bg-success-bg text-success ring-success/20",
   warning: "bg-warning-bg text-warning ring-warning/20",
   danger: "bg-danger-bg text-danger ring-danger/20",
-  dark: "bg-navy-900 text-white ring-navy-900",
+  dark: "bg-deep-900 text-white ring-deep-900",
 } as const;
 export type Tone = keyof typeof badgeTones;
 export function Badge({ tone = "neutral", className, ...p }: React.HTMLAttributes<HTMLSpanElement> & { tone?: Tone }) {
@@ -67,7 +68,7 @@ export function Alert({ tone = "info", title, children, className }: { tone?: "i
 
 export function EmptyState({ title, body, action, icon }: { title: string; body?: string; action?: React.ReactNode; icon?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-white px-6 py-12 text-center">
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-paper px-6 py-12 text-center">
       <div className="mb-3 grid size-12 place-items-center rounded-full bg-royal-50 text-royal-600">{icon ?? <Inbox className="size-6" aria-hidden />}</div>
       <p className="font-semibold text-navy-900">{title}</p>
       {body && <p className="mt-1 max-w-md text-sm text-muted">{body}</p>}
@@ -99,7 +100,7 @@ export function Stat({ label, value, hint, icon }: { label: string; value: React
 
 export function Table({ head, children, empty }: { head: React.ReactNode[]; children: React.ReactNode; empty?: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-line">
+    <div className="overflow-x-auto rounded-2xl bg-paper ring-1 ring-line">
       <table className="w-full min-w-[640px] text-sm">
         <thead className="bg-surface text-start text-xs font-semibold uppercase tracking-wide text-muted">
           <tr>{head.map((h, i) => <th key={i} scope="col" className="px-4 py-3 text-start">{h}</th>)}</tr>

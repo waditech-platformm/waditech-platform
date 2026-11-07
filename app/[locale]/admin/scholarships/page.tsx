@@ -29,7 +29,7 @@ export default async function AdminScholarships({ params, searchParams }: PagePr
           <tr key={s.id}>
             <Td className="font-semibold">{pick(s, "title", locale)} <DemoBadge show={s.is_test_data} label={d.common.demoBadge} /></Td>
             <Td>{s.coverage_percent}%</Td>
-            <Td>{s.deadline ? formatDate(s.deadline, locale) : "—"}</Td>
+            <Td>{s.deadline ? formatDate(s.deadline, locale) : "-"}</Td>
             <Td><Badge tone={toneFor(s.status)}>{s.status}</Badge></Td>
             <Td><Link className="text-sm font-semibold text-royal-600" href={`/${locale}/admin/scholarships?edit=${s.id}`}>{a.editItem}</Link></Td>
           </tr>
@@ -49,7 +49,7 @@ export default async function AdminScholarships({ params, searchParams }: PagePr
           <AreaField name="criteria_ar" label={a.criteriaAr} defaultValue={editing?.criteria_ar} rows={3} dir="rtl" />
           <TextField name="coverage_percent" label={a.coverage} type="number" defaultValue={editing?.coverage_percent ?? 100} />
           <TextField name="deadline" label={a.deadline} type="datetime-local" defaultValue={toLocalInput(editing?.deadline)} />
-          <SelectField name="course_id" label={d.nav.programs} defaultValue={editing?.course_id ?? ""} options={[["", "—"], ...(courses ?? []).map((c) => [c.id, c.title_en] as [string, string])]} />
+          <SelectField name="course_id" label={d.nav.programs} defaultValue={editing?.course_id ?? ""} options={[["", "-"], ...(courses ?? []).map((c) => [c.id, c.title_en] as [string, string])]} />
           <div className="flex items-end"><SubmitButton pendingLabel={d.common.saving}>{d.common.save}</SubmitButton></div>
         </ActionForm>
       </Card>
@@ -58,8 +58,8 @@ export default async function AdminScholarships({ params, searchParams }: PagePr
         <Table head={[d.common.name, a.scholarships, d.common.date, d.common.status]}>
           {appRows.map((r) => (
             <tr key={r.id}>
-              <Td className="max-w-sm"><p className="font-semibold">{r.student_name ?? "—"}</p><p className="line-clamp-3 text-xs text-muted" dir="auto">{r.statement}</p></Td>
-              <Td>{r.scholarships ? pick(r.scholarships, "title", locale) : "—"}</Td>
+              <Td className="max-w-sm"><p className="font-semibold">{r.student_name ?? "-"}</p><p className="line-clamp-3 text-xs text-muted" dir="auto">{r.statement}</p></Td>
+              <Td>{r.scholarships ? pick(r.scholarships, "title", locale) : "-"}</Td>
               <Td className="text-xs">{formatDate(r.created_at, locale)}</Td>
               <Td>
                 <ActionForm action={A.reviewScholarshipAppAction} className="flex flex-wrap gap-1">

@@ -36,7 +36,7 @@ export default async function TrainerPage({ params }: PageProps<"/[locale]/train
   ];
   return (
     <>
-      <section className="border-b border-line bg-white">
+      <section className="border-b border-line bg-paper">
         <Container className="py-12 sm:py-16">
           <nav className="text-sm text-subtle"><Link href={`/${locale}/trainers`} className="hover:text-royal-600">{d.nav.trainers}</Link> / <span className="text-navy-900">{name}</span></nav>
           <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-center">

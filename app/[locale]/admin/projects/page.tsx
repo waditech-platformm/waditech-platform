@@ -2,7 +2,7 @@ import { isLocale, pick, formatDate, formatDateTime, formatMoney, type Locale } 
 import { getDict } from "@/lib/i18n/dictionary";
 import { requireAdmin } from "@/lib/auth/admin";
 import { createClient } from "@/lib/supabase/server";
-import { Badge, Card, DemoBadge, EmptyState, Table, Td } from "@/components/ui/primitives";
+import { Badge, Card, DemoBadge, EmptyState } from "@/components/ui/primitives";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { Input, Select } from "@/components/ui/form";
 import { AreaField, CheckField, SelectField, TextField, toLocalInput } from "@/features/admin/fields";

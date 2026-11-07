@@ -20,7 +20,7 @@ export function EventForm({ d, e, courses }: { d: Dict; e?: EventRow; courses: {
       <AreaField name="description_ar" label={t.descriptionAr} defaultValue={e?.description_ar} rows={6} dir="rtl" />
       <TextField name="capacity" label={t.capacity} type="number" defaultValue={e?.capacity} />
       <TextField name="cover_url" label={t.coverUrl} defaultValue={e?.cover_url} dir="ltr" />
-      <SelectField name="course_id" label={d.nav.programs} defaultValue={e?.course_id} options={[["", "—"], ...courses.map((c) => [c.id, c.title_en] as [string, string])]} />
+      <SelectField name="course_id" label={d.nav.programs} defaultValue={e?.course_id} options={[["", "-"], ...courses.map((c) => [c.id, c.title_en] as [string, string])]} />
       <CheckField name="registration_open" label={d.events.register} defaultChecked={e?.registration_open ?? true} className="self-end" />
       <div className="md:col-span-2"><SubmitButton>{d.common.save}</SubmitButton></div>
     </ActionForm>
