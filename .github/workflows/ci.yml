@@ -25,6 +25,10 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-16 >/dev/null
           sudo systemctl stop postgresql || true
+          # Newer runner images make $HOME 750, so the postgres user couldn't reach the checkout
+          # ("initdb: could not access directory .../.local-stack/pgdata: Permission denied").
+          # Grant traverse (x) only on the path down to the workspace.
+          sudo chmod o+x "$HOME" "$(dirname "$(dirname "$GITHUB_WORKSPACE")")" "$(dirname "$GITHUB_WORKSPACE")" "$GITHUB_WORKSPACE"
           PG_RUN_AS=postgres sudo -E bash scripts/local-stack/stack.sh setup
           sudo -E bash scripts/local-stack/stack.sh start < /dev/null > /tmp/stack.log 2>&1
           node scripts/local-stack/gen-env.mjs
