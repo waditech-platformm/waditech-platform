@@ -113,7 +113,7 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
-      <section className="border-b border-line bg-white">
+      <section className="border-b border-line bg-paper">
         <Container className="grid grid-cols-1 items-center gap-10 py-12 [&>*]:min-w-0 lg:grid-cols-[1.3fr_1fr] lg:py-16">
           <div>
             <nav aria-label="Breadcrumb" className="text-sm text-subtle"><Link href={p("/programs")} className="hover:text-royal-600">{d.nav.programs}</Link> / <span className="text-navy-900">{d.enums.category[c.category as keyof typeof d.enums.category]}</span></nav>
@@ -123,9 +123,9 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
             <CourseStatsLine s={st} d={d} locale={locale} className="mt-4 text-sm" />
             <dl className="mt-8 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 xl:grid-cols-5">
               {[
-                [Users, d.programs.ages, c.age_min ? `${c.age_min}–${c.age_max}` : "—"],
+                [Users, d.programs.ages, c.age_min ? `${c.age_min}–${c.age_max}` : "-"],
                 ...(c.grade_min && c.grade_max ? [[GraduationCap, d.community.grade, `${c.grade_min}–${c.grade_max}`]] : []),
-                [Clock, d.programs.duration, c.duration_weeks ? `${c.duration_weeks} ${d.common.weeks}` : "—"],
+                [Clock, d.programs.duration, c.duration_weeks ? `${c.duration_weeks} ${d.common.weeks}` : "-"],
                 [Signal, d.programs.level, d.enums.level[c.level as keyof typeof d.enums.level]],
                 [MonitorSmartphone, d.programs.mode, d.enums.mode[c.delivery_mode as keyof typeof d.enums.mode]],
               ].map(([Icon, k, v]) => {
@@ -134,7 +134,7 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
               })}
             </dl>
           </div>
-          <div className="relative aspect-[16/10] overflow-hidden rounded-[28px] bg-navy-900 ring-1 ring-line">
+          <div className="relative aspect-[16/10] overflow-hidden rounded-[28px] bg-deep-900 ring-1 ring-line">
             {c.cover_url && <Image src={c.cover_url} alt="" fill priority sizes="(min-width:1024px) 40vw, 100vw" className="object-cover" />}
           </div>
         </Container>
@@ -152,7 +152,7 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
             <h2 className="text-xl font-bold text-navy-900">{d.programs.curriculum} <span className="text-sm font-medium text-subtle">· {lessonCount} {d.programs.lessons}</span></h2>
             <div className="mt-4 space-y-3">
               {outline.map((m, i) => (
-                <details key={m.id} className="group rounded-2xl bg-white ring-1 ring-line" open={i === 0}>
+                <details key={m.id} className="group rounded-2xl bg-paper ring-1 ring-line" open={i === 0}>
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 font-semibold text-navy-900">
                     <span>{i + 1}. {pick(m, "title", locale)}</span><span className="text-xs font-medium text-subtle">{m.lessons.length} {d.programs.lessons}</span>
                   </summary>
@@ -171,14 +171,14 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
                   </ul>
                 </details>
               ))}
-              {outline.length === 0 && <p className="text-sm text-muted">—</p>}
+              {outline.length === 0 && <p className="text-sm text-muted">-</p>}
             </div>
           </section>
           {reqs.length > 0 && <section><h2 className="text-xl font-bold text-navy-900">{d.programs.requirements}</h2><ul className="mt-3 list-disc space-y-1 ps-5 text-sm text-muted">{reqs.map((r) => <li key={r}>{r}</li>)}</ul></section>}
           {(c.preview_video_url || media.length > 0) && (
             <section><h2 className="text-xl font-bold text-navy-900">{d.programs.gallery}</h2>
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {c.preview_video_url && <div className="relative col-span-2 row-span-2 aspect-square overflow-hidden rounded-2xl bg-navy-900"><VideoTile src={c.preview_video_url} label={pick(c, "title", locale)} className="absolute inset-0 size-full object-cover" /></div>}
+                {c.preview_video_url && <div className="relative col-span-2 row-span-2 aspect-square overflow-hidden rounded-2xl bg-deep-900"><VideoTile src={c.preview_video_url} label={pick(c, "title", locale)} className="absolute inset-0 size-full object-cover" /></div>}
                 {media.map((m) => <div key={m.id} className="relative aspect-square overflow-hidden rounded-2xl"><Image src={m.poster_url ?? m.url} alt={pick(m, "alt", locale)} fill sizes="25vw" className="object-cover" /></div>)}
               </div>
             </section>
@@ -186,7 +186,7 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
           {c.faqs.length > 0 && (
             <section><h2 className="text-xl font-bold text-navy-900">{d.programs.faqs}</h2>
               <div className="mt-4 space-y-2">{c.faqs.map((f, i) => (
-                <details key={i} className="rounded-xl bg-white p-4 ring-1 ring-line"><summary className="cursor-pointer font-semibold text-navy-900">{locale === "ar" ? f.q_ar : f.q_en}</summary><p className="mt-2 text-sm text-muted">{locale === "ar" ? f.a_ar : f.a_en}</p></details>
+                <details key={i} className="rounded-xl bg-paper p-4 ring-1 ring-line"><summary className="cursor-pointer font-semibold text-navy-900">{locale === "ar" ? f.q_ar : f.q_en}</summary><p className="mt-2 text-sm text-muted">{locale === "ar" ? f.a_ar : f.a_en}</p></details>
               ))}</div>
             </section>
           )}
@@ -196,7 +196,7 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
             {reviews.length === 0 ? <p className="mt-4 text-sm text-muted">{d.community.reviewsEmpty}</p> : (
               <ul className="mt-5 space-y-4">
                 {reviews.map((rv) => (
-                  <li key={rv.id} className="rounded-2xl bg-white p-5 ring-1 ring-line">
+                  <li key={rv.id} className="rounded-2xl bg-paper p-5 ring-1 ring-line">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span className="flex" role="img" aria-label={d.community.stars.replace("{n}", String(rv.rating))}>
                         {[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`size-4 ${n <= rv.rating ? "fill-amber-400 text-amber-400" : "text-line"}`} aria-hidden />)}
@@ -219,7 +219,7 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
                   <input type="hidden" name="slug" value={c.slug} />
                   {reviewAs.length === 1 ? <input type="hidden" name="student_id" value={reviewAs[0].id} /> : (
                     <div><Label htmlFor="student_id">{d.community.reviewFor}</Label>
-                      <select id="student_id" name="student_id" className="mt-1 h-11 w-full rounded-xl bg-white px-3 ring-1 ring-line">{reviewAs.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>
+                      <select id="student_id" name="student_id" className="mt-1 h-11 w-full rounded-xl bg-paper px-3 ring-1 ring-line">{reviewAs.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>
                   )}
                   <fieldset>
                     <legend className="text-sm font-semibold text-navy-900">{d.community.yourRating}</legend>
@@ -274,10 +274,10 @@ export default async function ProgramDetail({ params }: PageProps<"/[locale]/pro
       </Container>
 
       {related.filter((r) => r.id !== c.id).length > 0 && (
-        <section className="bg-white py-14">
+        <section className="bg-paper py-14">
           <Container>
             <SectionHeading title={d.programs.related} />
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{related.filter((r) => r.id !== c.id).slice(0, 3).map((r) => <CourseCard key={r.id} c={r} locale={locale} d={d} />)}</div>
+            <div className="wt-stagger grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{related.filter((r) => r.id !== c.id).slice(0, 3).map((r) => <CourseCard key={r.id} c={r} locale={locale} d={d} />)}</div>
           </Container>
         </section>
       )}

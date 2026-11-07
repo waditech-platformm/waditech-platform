@@ -26,7 +26,7 @@ export default async function LabPage({ params }: PageProps<"/[locale]/labs/[slu
       <h1 className="mt-1 text-3xl font-extrabold text-navy-900">{pick(lab, "title", locale)}</h1>
       <p className="mt-2 text-muted">{pick(lab, "summary", locale)}</p>
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        {lab.launch_url && <a href={lab.launch_url} target="_blank" rel="noopener noreferrer" className="inline-flex h-12 items-center gap-2 rounded-xl bg-royal-600 px-6 font-semibold text-white hover:bg-royal-700">{d.labs.launch}<ExternalLink className="size-4" aria-hidden /></a>}
+        {lab.launch_url && <a href={lab.launch_url} target="_blank" rel="noopener noreferrer" className="inline-flex h-12 items-center gap-2 rounded-xl bg-action px-6 font-semibold text-white hover:bg-action-hover">{d.labs.launch}<ExternalLink className="size-4" aria-hidden /></a>}
         <Badge tone="neutral">{lab.provider}</Badge>
       </div>
       <Alert tone="info" className="mt-4">{external ? d.labs.externalNote : d.labs.internalNote}</Alert>

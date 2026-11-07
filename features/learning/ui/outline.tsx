@@ -15,7 +15,7 @@ export function CourseOutline({ locale, d, slug, modules, lessons, progress, cur
   const done = lessons.filter((l) => progress.get(l.id)?.status === "completed").length;
   const pct = lessons.length ? Math.round((done * 100) / lessons.length) : 0;
   return (
-    <nav aria-label={d.learn.courseContent} className="rounded-2xl bg-white ring-1 ring-line">
+    <nav aria-label={d.learn.courseContent} className="rounded-2xl bg-paper ring-1 ring-line">
       <div className="border-b border-line p-4">
         <p className="font-bold text-navy-900">{d.learn.courseContent}</p>
         <div className="mt-2 flex items-center gap-2 text-xs text-subtle"><ProgressBar value={pct} className="flex-1" label={d.dashboard.progress} />{done}/{lessons.length}</div>

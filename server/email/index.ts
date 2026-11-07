@@ -6,10 +6,18 @@ import { env } from "@/lib/env";
  *  - "none"   (default): nothing is sent; notifications stay queued until a provider is configured.
  *  - "smtp"   : any SMTP server (SMTP_URL, e.g. smtp://user:pass@host:587). Used locally with the mail catcher.
  *  - "resend" : Resend HTTP API (RESEND_API_KEY).
- * Templates are bilingual and contain only the notification text and a link back to the platform — never grades,
+ * Templates are bilingual and contain only the notification text and a link back to the platform: never grades,
  * payment details or other private data beyond what the in-app notification already shows to that user.
  */
-export type OutgoingEmail = { to: string; subject: string; html: string; text: string };
+/*
+ * TODO(launch): EMAIL PROVIDER. EMAIL_PROVIDER=none on staging, so notification emails stay queued and sign-up / reset
+ * emails come from Supabase's built-in sender (rate-limited, not for production).
+ *   1. Choose Resend (simplest) or SMTP; verify the sending domain (SPF, DKIM, DMARC) for waditech.co.
+ *   2. Vercel env: EMAIL_PROVIDER, EMAIL_FROM, RESEND_API_KEY or SMTP_URL, CRON_SECRET (the queue worker uses it).
+ *   3. Supabase > Authentication > SMTP: point auth emails at the same provider, and set Site URL + redirect URLs.
+ *   4. Contact-form staff alerts: see contactAction in features/engagement/actions.ts.
+ */
+export type OutgoingEmail ={ to: string; subject: string; html: string; text: string };
 export interface EmailProvider {
   name: string;
   send(mail: OutgoingEmail): Promise<void>;
@@ -78,6 +86,6 @@ ${blocks.map((b, i) => `<tr><td dir="${b.dir}" lang="${b.lang}" style="padding:$
 ${b.cta ? `<p style="margin:18px 0 8px"><a href="${esc(href)}" style="display:inline-block;background:#2456d3;color:#fff;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:10px">${b.cta}</a></p>` : ""}</td></tr>`).join("")}
 <tr><td style="padding:14px 24px;border-top:1px solid #e3e8f2;font-size:11px;color:#586283">You receive this because you have a WadiTech Academy account. · وصلتك هذه الرسالة لأن لديك حسابًا في أكاديمية وادي تك.</td></tr>
 </table></td></tr></table></body></html>`;
-  const text = `${title}\n\n${blocks[0].body}\n\n${href}\n\n—\n${blocks[1].title}\n${blocks[1].body}`;
+  const text = `${title}\n\n${blocks[0].body}\n\n${href}\n\n-\n${blocks[1].title}\n${blocks[1].body}`;
   return { to: n.email, subject: `${title} · WadiTech Academy`, html, text };
 }

@@ -39,7 +39,7 @@ export default async function Programs({ params, searchParams }: PageProps<"/[lo
     <>
       <PageHeader title={d.programs.title} subtitle={d.programs.subtitle} />
       <Container className="py-10">
-        <form method="get" className="grid gap-3 rounded-2xl bg-white p-4 ring-1 ring-line sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(6,1fr)_auto] lg:items-end" role="search">
+        <form method="get" className="grid gap-3 rounded-2xl bg-paper p-4 ring-1 ring-line sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(6,1fr)_auto] lg:items-end" role="search">
           <div><Label htmlFor="q">{d.common.search}</Label><Input id="q" name="q" defaultValue={safe.q} placeholder={d.common.search} /></div>
           <div><Label htmlFor="category">{d.programs.category}</Label>
             <Select id="category" name="category" defaultValue={safe.category ?? ""}><option value="">{d.common.all}</option>{CATS.map((c) => <option key={c} value={c}>{d.enums.category[c]}</option>)}</Select></div>
@@ -59,7 +59,7 @@ export default async function Programs({ params, searchParams }: PageProps<"/[lo
           <p aria-live="polite"><span className="font-bold text-navy-900">{courses.length}</span> {d.programs.results}</p>
           {active && <Link href={`/${locale}/programs`} className="font-semibold text-royal-600">{d.common.clearFilters}</Link>}
         </div>
-        <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{courses.map((c) => <CourseCard key={c.id} c={c} locale={locale} d={d} stats={stats.get(c.id)} />)}</div>
+        <div className="wt-stagger mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{courses.map((c) => <CourseCard key={c.id} c={c} locale={locale} d={d} stats={stats.get(c.id)} />)}</div>
         {courses.length === 0 && <EmptyState title={d.programs.noResults} action={<Link href={`/${locale}/programs`} className="font-semibold text-royal-600">{d.common.clearFilters}</Link>} />}
       </Container>
     </>

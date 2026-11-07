@@ -27,12 +27,12 @@ export function AssistantPanel({ courseId, lessonId }: { courseId: string; lesso
     } finally { setBusy(false); }
   }
   return (
-    <section aria-labelledby="ai-title" className="rounded-2xl bg-white ring-1 ring-line">
+    <section aria-labelledby="ai-title" className="rounded-2xl bg-paper ring-1 ring-line">
       <div className="flex items-center gap-2 border-b border-line px-4 py-3"><Bot className="size-5 text-royal-600" aria-hidden /><h2 id="ai-title" className="font-bold text-navy-900">{dict.ai.title}</h2></div>
       <div className="max-h-80 space-y-3 overflow-y-auto p-4 text-sm" aria-live="polite">
         {msgs.length === 0 && <p className="text-subtle">{dict.ai.disclaimer}</p>}
         {msgs.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "ms-8 rounded-xl bg-royal-600 px-3 py-2 text-white" : "me-8 whitespace-pre-wrap rounded-xl bg-surface px-3 py-2 text-ink"}>{m.content}</div>
+          <div key={i} className={m.role === "user" ? "ms-8 rounded-xl bg-action px-3 py-2 text-white" : "me-8 whitespace-pre-wrap rounded-xl bg-surface px-3 py-2 text-ink"}>{m.content}</div>
         ))}
         {busy && <p className="flex items-center gap-2 text-subtle"><Loader2 className="size-4 animate-spin" aria-hidden />{dict.ai.thinking}</p>}
         {mode === "local" && <p className="text-[11px] text-subtle">{dict.ai.devMode}</p>}
@@ -41,7 +41,7 @@ export function AssistantPanel({ courseId, lessonId }: { courseId: string; lesso
         <label htmlFor="ai-q" className="sr-only">{dict.ai.placeholder}</label>
         <input id="ai-q" value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000} placeholder={dict.ai.placeholder}
           className="h-10 min-w-0 flex-1 rounded-xl border border-line px-3 text-sm focus:border-royal-500 focus:outline-none focus:ring-4 focus:ring-royal-100" />
-        <button type="submit" disabled={busy || !input.trim()} className="grid size-10 place-items-center rounded-xl bg-royal-600 text-white disabled:opacity-50" aria-label={dict.ai.send}><Send className="size-4 rtl:-scale-x-100" aria-hidden /></button>
+        <button type="submit" disabled={busy || !input.trim()} className="grid size-10 place-items-center rounded-xl bg-action text-white disabled:opacity-50" aria-label={dict.ai.send}><Send className="size-4 rtl:-scale-x-100" aria-hidden /></button>
       </form>
     </section>
   );

@@ -31,10 +31,10 @@ export default async function TrainerHome({ params }: PageProps<"/[locale]/train
         <Stat label={d.trainer.quizReviews} value={reviews ?? 0} />
       </div>
       {(courses ?? []).length === 0 ? <EmptyState title={d.common.emptyTitle} /> : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(courses ?? []).map((c) => (
+        <div className="wt-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(courses ?? []).map((c) => (
           <Link key={c.id} href={`/${locale}/trainer/courses/${c.id}`}>
             <Card className="overflow-hidden transition hover:shadow-[var(--shadow-lift)]">
-              <div className="relative aspect-[16/8] bg-navy-900">{c.thumbnail_url && <Image src={c.thumbnail_url} alt="" fill sizes="33vw" className="object-cover" />}</div>
+              <div className="relative aspect-[16/8] bg-deep-900">{c.thumbnail_url && <Image src={c.thumbnail_url} alt="" fill sizes="33vw" className="object-cover" />}</div>
               <div className="p-4"><p className="font-bold text-navy-900">{pick(c, "title", locale)}</p>
                 <p className="mt-1 flex items-center gap-2 text-sm text-muted">{counts.get(c.id) ?? 0} {d.trainer.students}<Badge tone={c.status === "published" ? "success" : "neutral"}>{c.status}</Badge></p></div>
             </Card>

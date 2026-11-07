@@ -16,7 +16,7 @@ export default async function Gallery({ params, searchParams }: PageProps<"/[loc
   const sp = await searchParams;
   const cat = typeof sp.category === "string" && (CATS as readonly string[]).includes(sp.category) ? sp.category : undefined;
   const [photos, videos] = await Promise.all([listMedia({ kind: "image", category: cat, limit: 80 }), cat ? Promise.resolve([]) : listMedia({ kind: "video", limit: 12 })]);
-  const chip = (active: boolean) => cn("rounded-full px-3 py-1.5 text-sm font-semibold ring-1", active ? "bg-navy-900 text-white ring-navy-900" : "bg-white ring-line");
+  const chip = (active: boolean) => cn("rounded-full px-3 py-1.5 text-sm font-semibold ring-1", active ? "bg-deep-900 text-white ring-deep-900" : "bg-paper ring-line");
   return (
     <>
       <PageHeader title={d.gallery.title} subtitle={d.gallery.subtitle} />
@@ -26,12 +26,12 @@ export default async function Gallery({ params, searchParams }: PageProps<"/[loc
           {CATS.map((c) => <Link key={c} href={`/${locale}/gallery?category=${c}`} className={chip(cat === c)}>{d.gallery.categories[c]}</Link>)}
         </div>
         {videos.length > 0 && (<section className="mb-10"><h2 className="mb-4 text-lg font-bold text-navy-900">{d.gallery.videos}</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{videos.map((v) => <div key={v.id} className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-navy-900"><VideoTile src={v.url} poster={v.poster_url} label={pick(v, "alt", locale)} className="absolute inset-0 size-full object-cover" /></div>)}</div></section>)}
+          <div className="wt-stagger grid grid-cols-2 gap-3 md:grid-cols-4">{videos.map((v) => <div key={v.id} className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-deep-900"><VideoTile src={v.url} poster={v.poster_url} label={pick(v, "alt", locale)} className="absolute inset-0 size-full object-cover" /></div>)}</div></section>)}
         <h2 className="mb-4 text-lg font-bold text-navy-900">{d.gallery.photos}</h2>
         {photos.length === 0 ? <EmptyState title={d.common.emptyTitle} /> : (
           <div className="columns-2 gap-3 md:columns-3 lg:columns-4 [&>*]:mb-3">
             {photos.map((m) => (
-              <a key={m.id} href={m.url} target="_blank" rel="noopener" className="block overflow-hidden rounded-2xl bg-navy-900">
+              <a key={m.id} href={m.url} target="_blank" rel="noopener" className="block overflow-hidden rounded-2xl bg-deep-900">
                 <Image src={m.url} alt={pick(m, "alt", locale)} width={m.width ?? 800} height={m.height ?? 600} sizes="(min-width:1024px) 25vw, 50vw" className="h-auto w-full transition hover:scale-[1.02]" />
               </a>
             ))}

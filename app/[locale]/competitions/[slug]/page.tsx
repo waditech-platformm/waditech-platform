@@ -27,8 +27,8 @@ export default async function CompetitionPage({ params }: PageProps<"/[locale]/c
       <h1 className="mt-2 text-3xl font-extrabold text-navy-900">{pick(c, "title", locale)}</h1>
       <p className="mt-3 text-muted">{pick(c, "description", locale)}</p>
       <dl className="mt-6 grid gap-3 sm:grid-cols-3">
-        <Card className="p-4"><dt className="text-xs text-subtle">{d.competitions.deadline}</dt><dd className="font-bold">{c.registration_deadline ? formatDate(c.registration_deadline, locale) : "—"}</dd></Card>
-        <Card className="p-4"><dt className="text-xs text-subtle">{d.competitions.eventDate}</dt><dd className="font-bold">{c.event_date ? formatDate(c.event_date, locale) : "—"}</dd></Card>
+        <Card className="p-4"><dt className="text-xs text-subtle">{d.competitions.deadline}</dt><dd className="font-bold">{c.registration_deadline ? formatDate(c.registration_deadline, locale) : "-"}</dd></Card>
+        <Card className="p-4"><dt className="text-xs text-subtle">{d.competitions.eventDate}</dt><dd className="font-bold">{c.event_date ? formatDate(c.event_date, locale) : "-"}</dd></Card>
         <Card className="p-4"><dt className="text-xs text-subtle">{d.competitions.teamSize}</dt><dd className="font-bold">{c.team_min}–{c.team_max}</dd></Card>
       </dl>
       {pick(c, "eligibility", locale) && <Card className="mt-4 p-5"><p className="text-sm font-bold text-navy-900">{d.competitions.eligibility}</p><p className="mt-1 text-sm text-muted">{pick(c, "eligibility", locale)}</p></Card>}

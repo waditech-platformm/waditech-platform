@@ -9,8 +9,8 @@ export async function login(page: Page, email: string, password = DEMO_PASSWORD,
   // reset only the LOCAL login counters so the limiter itself stays enabled and is exercised elsewhere.
   await db("delete from public.rate_limits where bucket like 'login:%'");
   await page.goto(`/${locale}/login`);
-  await page.locator('input[name="email"]').fill(email);
-  await page.locator('input[name="password"]').fill(password);
+  await page.locator('main input[name="email"]').fill(email);
+  await page.locator('main input[name="password"]').fill(password);
   await page.locator('form button[type="submit"]').click();
   await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 }

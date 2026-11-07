@@ -32,7 +32,7 @@ export default async function QuizPage({ params }: PageProps<"/[locale]/learn/[s
       <dl className="mt-5 grid grid-cols-3 gap-3 text-sm">
         <Card className="p-3"><dt className="text-subtle">{d.quiz.passMark}</dt><dd className="font-bold">{quiz.pass_percent}%</dd></Card>
         <Card className="p-3"><dt className="text-subtle">{d.quiz.attempts}</dt><dd className="font-bold">{used} / {quiz.max_attempts ?? d.quiz.unlimited}</dd></Card>
-        <Card className="p-3"><dt className="text-subtle">{d.quiz.timeLimit}</dt><dd className="font-bold">{quiz.time_limit_minutes ? `${quiz.time_limit_minutes} ${d.common.minutes}` : "—"}</dd></Card>
+        <Card className="p-3"><dt className="text-subtle">{d.quiz.timeLimit}</dt><dd className="font-bold">{quiz.time_limit_minutes ? `${quiz.time_limit_minutes} ${d.common.minutes}` : "-"}</dd></Card>
       </dl>
       <div className="mt-8">
         {open ? <QuizForm attemptId={open.id} questions={quiz.questions} />
@@ -43,7 +43,7 @@ export default async function QuizPage({ params }: PageProps<"/[locale]/learn/[s
       {list.filter((t) => t.status !== "in_progress").length > 0 && (
         <section className="mt-10">
           <h2 className="font-bold text-navy-900">{d.quiz.history}</h2>
-          <ul className="mt-3 divide-y divide-line rounded-2xl bg-white ring-1 ring-line">
+          <ul className="mt-3 divide-y divide-line rounded-2xl bg-paper ring-1 ring-line">
             {list.filter((t) => t.status !== "in_progress").map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-3 p-4 text-sm">
                 <span>#{t.attempt_number} · {t.submitted_at && formatDateTime(t.submitted_at, locale)}{t.feedback && <span className="block text-xs text-subtle">{t.feedback}</span>}</span>

@@ -40,9 +40,9 @@ export default async function CourseEditor({ params }: PageProps<"/[locale]/admi
     admin ? supabase.rpc("admin_list_users", { p_role: "trainer", p_limit: 200 }) : Promise.resolve({ data: [] }),
   ]);
   type Q = { id: string; kind: string; prompt_en: string; points: number; position: number; answer_options: { id: string; label_en: string; position: number }[]; question_keys: { correct_option_ids: string[]; accepted_answers: string[] } | null };
-  const asOpts: [string, string][] = [["", "—"], ...(assessments ?? []).map((x) => [x.id, x.title_en] as [string, string])];
-  const agOpts: [string, string][] = [["", "—"], ...(assignments ?? []).map((x) => [x.id, x.title_en] as [string, string])];
-  const labOpts: [string, string][] = [["", "—"], ...(labs ?? []).map((x) => [x.id, x.title_en] as [string, string])];
+  const asOpts: [string, string][] = [["", "-"], ...(assessments ?? []).map((x) => [x.id, x.title_en] as [string, string])];
+  const agOpts: [string, string][] = [["", "-"], ...(assignments ?? []).map((x) => [x.id, x.title_en] as [string, string])];
+  const labOpts: [string, string][] = [["", "-"], ...(labs ?? []).map((x) => [x.id, x.title_en] as [string, string])];
   const lessonFields = (m: { id: string }, ls?: NonNullable<typeof lessons>[number]) => (
     <>
       {ls && <input type="hidden" name="id" value={ls.id} />}
@@ -155,8 +155,8 @@ export default async function CourseEditor({ params }: PageProps<"/[locale]/admi
                     <input type="hidden" name="assessment_id" value={as.id} />
                     <SelectField name="kind" label={a.lessonType} options={[["single_choice", "single_choice"], ["multiple_choice", "multiple_choice"], ["short_answer", "short_answer"]]} />
                     <TextField name="prompt_en" label={a.titleEn} required dir="ltr" /><TextField name="prompt_ar" label={a.titleAr} required dir="rtl" />
-                    <AreaField name="options" label="Options — one per line: English | Arabic (prefix * for correct)" rows={4} dir="ltr" />
-                    <AreaField name="accepted" label="Short answer — accepted answers, one per line (leave empty for manual review)" rows={2} dir="ltr" />
+                    <AreaField name="options" label="Options: one per line: English | Arabic (prefix * for correct)" rows={4} dir="ltr" />
+                    <AreaField name="accepted" label="Short answer: accepted answers, one per line (leave empty for manual review)" rows={2} dir="ltr" />
                     <div className="grid grid-cols-2 gap-3"><TextField name="points" label={d.quiz.points} type="number" defaultValue={1} /><TextField name="position" label={a.position} type="number" defaultValue={(as.questions?.length ?? 0) + 1} /></div>
                     <SubmitButton size="sm">{a.addQuestion}</SubmitButton>
                   </ActionForm>

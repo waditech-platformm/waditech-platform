@@ -4,6 +4,10 @@ import { demo, login } from "./helpers";
 
 // WCAG 2.1 AA automated checks (axe-core). Automated checks catch roughly a third of issues;
 // manual keyboard and screen-reader review is still listed in docs/TEST_PLAN.md.
+// Measure the settled page: scroll-driven reveals fade content in, and axe would otherwise
+// compute contrast on half-transparent text mid-animation. Reduced motion shows everything at rest.
+test.use({ reducedMotion: "reduce" });
+
 const PUBLIC = ["/en", "/ar", "/en/programs", "/ar/programs", "/en/programs/robotics-foundations", "/en/news", "/en/events", "/en/labs", "/en/contact", "/en/login", "/ar/register", "/en/verify", "/en/trainers", "/ar/trainers/demo-lina", "/en/library", "/ar/library"];
 
 for (const path of PUBLIC) {

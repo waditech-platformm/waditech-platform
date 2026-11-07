@@ -37,9 +37,100 @@
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-arabic: "Cairo Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 
+  /* Theme-aware roles (redefined for dark below). Prefer these over raw white/navy in components. */
+  --color-paper: #ffffff; /* raised surfaces: header, cards, panels */
+  --color-deep-950: #041228; /* brand-dark panels: stay dark in BOTH themes */
+  --color-deep-900: #0a1a36;
+  --color-deep-800: #11274f;
+  --color-action: #006bbd; /* filled buttons with white text (5.5:1 in both themes) */
+  --color-action-hover: #005a9e;
+  --color-cyan-ink: #006b7a;
+  --color-trace: rgb(0 137 235 / 0.22); /* circuit background lines */
+  --color-pulse: #00c6e0; /* circuit background signals */
+
   --radius-card: 1.5rem;
   --shadow-card: 0 1px 2px rgb(10 26 54 / 0.06), 0 8px 24px -12px rgb(10 26 54 / 0.18);
   --shadow-lift: 0 2px 4px rgb(10 26 54 / 0.08), 0 18px 40px -18px rgb(10 26 54 / 0.35);
+}
+
+/* =========================================================
+   Dark theme. Applied when the visitor picks it (data-theme="dark"),
+   or follows a dark OS setting and hasn't picked light.
+   Brand panels (deep-*) and the action colour intentionally don't change.
+   ========================================================= */
+:root { color-scheme: light; }
+/* .dark-island: a section that is always dark (e.g. the photo hero), whatever the site theme.
+   It reuses the dark palette, so text, buttons and the logo inside it adapt automatically. */
+.dark-island { color: var(--color-ink); }
+:root[data-theme="dark"], .dark-island {
+  color-scheme: dark;
+  --color-paper: #0e1b33;
+  --color-surface: #071224;
+  --color-card: #0e1b33;
+  --color-line: #1e2f50;
+  --color-ink: #e4ebf7;
+  --color-muted: #a7b3cc;
+  --color-subtle: #93a0be;
+  --color-navy-900: #f1f5fc; /* headings and strong text */
+  --color-navy-800: #d3dcee;
+  --color-navy-700: #b5c3de;
+  --color-royal-700: #8ccbff;
+  --color-royal-600: #5cb6ff; /* links and accents on dark (7:1) */
+  --color-royal-500: #3aa6f5;
+  --color-royal-100: #173a66;
+  --color-royal-50: #11284a;
+  --color-cyan-600: #3fd6ec;
+  --color-cyan-100: #0b3644;
+  --color-cyan-ink: #7fe3f3;
+  --color-success: #63d5a6;
+  --color-success-bg: #0d2e24;
+  --color-warning: #f3c96f;
+  --color-warning-bg: #33280c;
+  --color-danger: #e5484d;
+  --color-danger-bg: #3a1618;
+  --color-trace: rgb(92 182 255 / 0.13);
+  --color-pulse: #3fe0f5;
+  --logo-light: none; /* show the dark-theme logo (light tagline) */
+  --logo-dark: block;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -14px rgb(0 0 0 / 0.7);
+  --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.45), 0 22px 44px -18px rgb(0 0 0 / 0.8);
+}
+/* Same palette for visitors who haven't chosen, when their OS is dark (no script needed).
+   Keep in sync with the block above. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-paper: #0e1b33;
+    --color-surface: #071224;
+    --color-card: #0e1b33;
+    --color-line: #1e2f50;
+    --color-ink: #e4ebf7;
+    --color-muted: #a7b3cc;
+    --color-subtle: #93a0be;
+    --color-navy-900: #f1f5fc;
+    --color-navy-800: #d3dcee;
+    --color-navy-700: #b5c3de;
+    --color-royal-700: #8ccbff;
+    --color-royal-600: #5cb6ff;
+    --color-royal-500: #3aa6f5;
+    --color-royal-100: #173a66;
+    --color-royal-50: #11284a;
+    --color-cyan-600: #3fd6ec;
+    --color-cyan-100: #0b3644;
+    --color-cyan-ink: #7fe3f3;
+    --color-success: #63d5a6;
+    --color-success-bg: #0d2e24;
+    --color-warning: #f3c96f;
+    --color-warning-bg: #33280c;
+    --color-danger: #e5484d;
+    --color-danger-bg: #3a1618;
+    --color-trace: rgb(92 182 255 / 0.13);
+    --color-pulse: #3fe0f5;
+    --logo-light: none;
+    --logo-dark: block;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -14px rgb(0 0 0 / 0.7);
+    --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.45), 0 22px 44px -18px rgb(0 0 0 / 0.8);
+  }
 }
 
 html {
@@ -69,7 +160,7 @@ html[lang="ar"] .font-latin { font-family: var(--font-sans); }
 
 /* subtle neural-network pattern used on navy surfaces */
 .bg-neural {
-  background-color: var(--color-navy-900);
+  background-color: var(--color-deep-900); /* brand-dark in both themes (navy-900 flips to light text colour in dark mode) */
   background-image:
     radial-gradient(circle at 1px 1px, rgb(0 198 224 / 0.18) 1px, transparent 0),
     radial-gradient(ellipse 80% 60% at 85% 10%, rgb(0 137 235 / 0.45), transparent 60%),
@@ -86,7 +177,7 @@ html[lang="ar"] .font-latin { font-family: var(--font-sans); }
 .prose-wt ol { list-style: decimal; padding-inline-start: 1.4em; }
 .prose-wt a { color: var(--color-royal-600); text-decoration: underline; }
 .prose-wt code { background: var(--color-royal-50); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
-.prose-wt pre { background: var(--color-navy-900); color: #e6ecff; padding: 1rem; border-radius: 12px; overflow-x: auto; direction: ltr; text-align: left; }
+.prose-wt pre { background: var(--color-deep-900); color: #e6ecff; padding: 1rem; border-radius: 12px; overflow-x: auto; direction: ltr; text-align: left; }
 .prose-wt pre code { background: transparent; padding: 0; }
 
 /* Bidirectional technical content: keep code & identifiers LTR inside Arabic text */
@@ -95,6 +186,70 @@ bdi, .ltr { direction: ltr; unicode-bidi: isolate; }
 @media print {
   .no-print { display: none !important; }
   body { background: white; }
+}
+
+/* Theme switch: smooth colour cross-fade where View Transitions aren't available. */
+html.wt-theming, html.wt-theming * { transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease, fill 0.35s ease !important; }
+/* View Transition: the new theme grows out of the toggle as a circle (see theme-toggle.tsx). */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) { animation: wt-reveal 0.55s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes wt-reveal { from { clip-path: circle(0 at var(--wt-x, 50%) var(--wt-y, 0%)); } to { clip-path: circle(var(--wt-r, 150vmax) at var(--wt-x, 50%) var(--wt-y, 0%)); } }
+
+/* Logo: one of two files is shown per theme (see components/brand-logo.tsx). */
+.wt-logo { display: inline-block; line-height: 0; }
+.wt-logo-light { display: var(--logo-light, block); }
+.wt-logo-dark { display: var(--logo-dark, none); }
+
+/* Section headings drift into place as they scroll in (CSS scroll-driven, no JS).
+   Content is fully visible where unsupported or with reduced motion. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .wt-reveal { animation: wt-reveal-in linear both; animation-timeline: view(); animation-range: entry 0% entry 55%; }
+  }
+}
+@keyframes wt-reveal-in { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+
+/* Lists and cards rise in as they scroll into view. Each item runs on its own view timeline,
+   so items in one row arrive together and later rows follow naturally (no JS, no stagger timers). */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .wt-stagger > *, .wt-reveal-soft {
+      animation: wt-rise-soft linear both;
+      animation-timeline: view();
+      animation-range: entry 5% entry 45%;
+    }
+  }
+}
+@keyframes wt-rise-soft { from { opacity: 0; transform: translateY(18px) scale(0.985); } to { opacity: 1; transform: none; } }
+
+/* Shared hover lift for clickable cards: answers the pointer, nothing more. */
+.wt-lift { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease; }
+.wt-lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+@media (prefers-reduced-motion: reduce) { .wt-lift:hover { transform: none; } }
+
+/* Photo hero (components/hero-backdrop.tsx): slides cross-fade; the visible one drifts slowly (Ken Burns).
+   Each slide gets its own drift direction via --kb-x / --kb-y. Reduced motion: no drift, no auto-advance. */
+.wt-slide { opacity: 0; transition: opacity 1.4s ease; }
+.wt-slide[data-active="true"] { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .wt-slide[data-active="true"] > img { animation: wt-kenburns 9s ease-out both; }
+}
+@keyframes wt-kenburns {
+  from { transform: scale(1.12) translate(var(--kb-x, 0%), var(--kb-y, 0%)); }
+  to { transform: scale(1.02) translate(0, 0); }
+}
+.wt-progress { transform-origin: left; animation: wt-progress linear forwards; }
+[dir="rtl"] .wt-progress { transform-origin: right; }
+@keyframes wt-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Lab reel marquee (components/lab-reel.tsx). Each track holds two copies, so -50% loops seamlessly. */
+.wt-marquee-track { animation: wt-marquee 60s linear infinite; }
+.wt-marquee-reverse { animation-direction: reverse; animation-duration: 70s; }
+.wt-marquee:hover .wt-marquee-track, .wt-marquee:focus-within .wt-marquee-track { animation-play-state: paused; }
+@keyframes wt-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .wt-marquee-track { animation: none; }
+  .wt-marquee-row { overflow-x: auto; }
 }
 
 /* Homepage hero: one orchestrated entrance, CSS only. Disabled for reduced motion. */

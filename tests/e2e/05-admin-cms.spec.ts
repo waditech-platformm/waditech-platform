@@ -21,7 +21,7 @@ test("every admin section loads in English and Arabic without errors", async ({ 
 
 test("visitor contact message reaches the admin inbox", async ({ page, browser }) => {
   await page.goto("/en/contact");
-  const form = page.locator("form").filter({ has: page.locator('textarea[name="message"]') });
+  const form = page.locator("main form").filter({ has: page.locator('textarea[name="message"]') });
   await form.locator('[name="name"]').fill(`E2E Visitor ${stamp}`);
   await form.locator('[name="email"]').fill(`visitor-${stamp}@test.local`);
   await form.locator('[name="message"]').fill("We would like a robotics program for our school next term.");

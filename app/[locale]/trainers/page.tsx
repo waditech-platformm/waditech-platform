@@ -25,12 +25,12 @@ export default async function Trainers({ params }: PageProps<"/[locale]/trainers
       <PageHeader title={c.trainersTitle} subtitle={c.trainersSubtitle} />
       <Container className="py-12 sm:py-16">
         {trainers.length === 0 ? <EmptyState title={c.trainersEmpty} /> : (
-          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="wt-stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {trainers.map((t) => {
               const name = pick(t, "display_name", locale);
               return (
                 <li key={t.trainer_id}>
-                  <Link href={`/${locale}/trainers/${t.slug}`} className="group flex h-full flex-col rounded-[24px] bg-white p-7 ring-1 ring-line transition-shadow hover:shadow-[var(--shadow-lift)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100">
+                  <Link href={`/${locale}/trainers/${t.slug}`} className="group flex h-full flex-col rounded-[24px] bg-paper p-7 ring-1 ring-line transition-shadow hover:shadow-[var(--shadow-lift)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100">
                     <span className="flex items-start justify-between gap-3">
                       <TrainerAvatar name={name} photo={t.photo_url} size={72} />
                       <DemoBadge show={t.is_test_data} label={d.common.demoBadge} />

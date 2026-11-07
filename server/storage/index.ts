@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *  - "supabase": Supabase Storage bucket `media` (production / staging).
  *  - "local": writes to public/uploads (local development only).
  * Every upload is validated by MAGIC BYTES (not the client-sent type), size-limited, renamed,
- * and images are re-encoded to WebP with all metadata (EXIF/GPS) stripped — important for children's privacy.
+ * and images are re-encoded to WebP with all metadata (EXIF/GPS) stripped: important for children's privacy.
  */
 const LIMITS = { image: 5 * 1024 * 1024, video: 50 * 1024 * 1024 };
 

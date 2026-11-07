@@ -30,8 +30,8 @@ export default async function AdminPayments({ params, searchParams }: PageProps<
         {rows.map((o) => (
           <tr key={o.id}>
             <Td className="font-latin text-xs" dir="ltr">{o.order_number}<div className="text-subtle">{formatDateTime(o.created_at, locale)}</div></Td>
-            <Td className="font-semibold">{o.profiles?.full_name ?? "—"}</Td>
-            <Td>{o.courses ? pick(o.courses, "title", locale) : "—"}</Td>
+            <Td className="font-semibold">{o.profiles?.full_name ?? "-"}</Td>
+            <Td>{o.courses ? pick(o.courses, "title", locale) : "-"}</Td>
             <Td className="font-latin" dir="ltr">{formatMoney(Number(o.total), o.currency, locale)}{o.is_sandbox && <Badge tone="warning" className="ms-2">{a.sandboxOrder}</Badge>}</Td>
             <Td><Badge tone={toneFor(o.status)}>{o.status}</Badge><div className="text-xs text-subtle">{o.provider}</div></Td>
             <Td>
@@ -54,7 +54,7 @@ export default async function AdminPayments({ params, searchParams }: PageProps<
             <tr key={t.id}>
               <Td className="text-xs">{formatDateTime(t.created_at, locale)}</Td>
               <Td className="text-xs">{t.provider} · {t.type}{t.is_sandbox ? " · sandbox" : ""}</Td>
-              <Td className="font-latin text-xs" dir="ltr">{t.provider_reference ?? "—"}<div className="text-subtle">{t.result_code}</div></Td>
+              <Td className="font-latin text-xs" dir="ltr">{t.provider_reference ?? "-"}<div className="text-subtle">{t.result_code}</div></Td>
               <Td className="font-latin" dir="ltr">{formatMoney(Number(t.amount), t.currency, locale)}</Td>
               <Td><Badge tone={toneFor(t.status)}>{t.status}</Badge></Td>
             </tr>

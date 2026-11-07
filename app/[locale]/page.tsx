@@ -7,10 +7,13 @@ import { Container } from "@/components/ui/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { listCourses } from "@/features/catalog/queries";
 import { listCompetitions, listLabs, listMedia } from "@/features/content/queries";
-import { HeroSlides } from "@/features/home/hero-slides";
+import { HeroBackdrop, type BackdropSlide } from "@/components/hero-backdrop";
+import { LabReel, type ReelItem } from "@/components/lab-reel";
 import { publicReviews } from "@/features/community/queries";
 import { Star } from "lucide-react";
 import { DemoBadge } from "@/components/ui/primitives";
+import { CircuitField } from "@/components/circuit-field";
+import { BrandLogo } from "@/components/brand-logo";
 
 /** Product names of lab providers (brand names, same in both languages). */
 const PROVIDERS: Record<string, string> = { wokwi: "Wokwi", python_online: "Python", tinkercad: "Tinkercad", scratch: "Scratch", internal: "WadiTech" };
@@ -20,7 +23,7 @@ const nfFor = (l: Locale) => new Intl.NumberFormat(l === "ar" ? "ar-JO" : "en-JO
 /** Eyebrow + headline + optional link, used by every section so the page keeps one rhythm. */
 function SectionHead({ eyebrow, title, href, link, dark }: { eyebrow: string; title: string; href?: string; link?: string; dark?: boolean }) {
   return (
-    <div className="mb-10 flex flex-col gap-5 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
+    <div className="wt-reveal mb-10 flex flex-col gap-5 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-3xl">
         <p className={`text-sm font-semibold ${dark ? "text-cyan-300" : "text-royal-600"}`}>{eyebrow}</p>
         <h2 className={`mt-3 text-3xl font-bold tracking-tight text-balance sm:text-[2.6rem] sm:leading-[1.12] ${dark ? "text-white" : "text-navy-900"}`}>{title}</h2>
@@ -57,10 +60,24 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
   ].filter(Boolean) as { v: string; k: string }[];
 
   const alt = (m: { alt_en: string | null; alt_ar: string | null }) => pick(m, "alt", locale) || "";
-  const slides = [
-    { src: "/media/brand/lab-entrance.webp", alt: locale === "ar" ? "مدخل مختبر الروبوتات في وادي تك" : "Entrance of the WadiTech robotics lab" },
-    { src: "/media/brand/lab-classroom.webp", alt: locale === "ar" ? "محطات البرمجة والروبوتات داخل مختبر وادي تك" : "Coding and robotics stations inside the WadiTech lab" },
-    ...photos.slice(0, 1).map((m) => ({ src: m.url, alt: alt(m) })),
+  // Hero background: lab and project photos with no identifiable students (public/media/hero).
+  // kb = start offset of the slow Ken Burns drift, so each photo moves differently.
+  const hp = h.heroPhotos;
+  const heroPhotos = [
+    { src: "/media/hero/lab-room-1600.webp", label: hp.labRoom, kb: ["-2%", "-1%"] },
+    { src: "/media/hero/drone-blue-1600.webp", label: hp.droneBlue, kb: ["2%", "1%"] },
+    { src: "/media/hero/code-screen-1600.webp", label: hp.codeScreen, kb: ["-1%", "2%"] },
+    { src: "/media/hero/drone-build-1600.webp", label: hp.droneBuild, kb: ["1.5%", "-1.5%"] },
+    { src: "/media/hero/soldering-1600.webp", label: hp.soldering, kb: ["-2%", "1%"] },
+    { src: "/media/hero/workbench-1600.webp", label: hp.workbench, kb: ["2%", "-1%"] },
+  ] satisfies BackdropSlide[];
+  // Lab reel: 6-second muted clips (public/media/reel) mixed with lab photos. Projects and hands, no student faces.
+  const rl = h.reel;
+  const clip = (name: keyof typeof rl): ReelItem => ({ kind: "video", src: `/media/reel/${name}.mp4`, poster: `/media/reel/${name}.jpg`, label: rl[name] });
+  const still = (src: string, label: string): ReelItem => ({ kind: "image", src, label });
+  const reelRows: [ReelItem[], ReelItem[]] = [
+    [clip("robot"), still("/media/hero/drone-build-1600.webp", hp.droneBuild), clip("sumo-arena"), clip("robotic-hand"), still("/media/hero/soldering-1600.webp", hp.soldering), clip("line-track"), clip("gesture-ai")],
+    [clip("robot-arm"), still("/media/hero/code-screen-1600.webp", hp.codeScreen), clip("robot-dog"), clip("lcd-build"), still("/media/hero/drone-blue-1600.webp", hp.droneBlue), clip("breadboard"), still("/media/hero/workbench-1600.webp", hp.workbench)],
   ];
   const photo = (i: number) => photos[i % Math.max(photos.length, 1)];
   const schoolCards = [
@@ -75,11 +92,17 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
 
   return (
     <>
-      {/* 1 — Hero */}
-      <section className="bg-white">
-        <Container className="grid grid-cols-1 items-center gap-12 pb-16 pt-12 [&>*]:min-w-0 sm:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pb-24 lg:pt-20">
-          <div>
-            <Image src="/media/brand/logo-original-960.png" alt={d.meta.fullName} width={960} height={640} priority className="wt-rise mb-8 h-auto w-60 sm:w-80" />
+      {/* 1. Hero */}
+      {/* Photo hero: our lab photos cross-fade behind the text. Always dark (dark-island) in both themes. */}
+      <section className="dark-island relative isolate flex min-h-[640px] items-center overflow-hidden bg-deep-950 lg:min-h-[min(84vh,820px)]">
+        <HeroBackdrop slides={heroPhotos} labels={{ region: h.slidesLabel, pause: h.slidePause, play: h.slidePlay, go: h.slideGo }} />
+        {/* legibility: deep on the text side, light on the photo side; plus a floor for the caption strip */}
+        <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-r from-deep-950/95 via-deep-950/75 to-deep-950/25 rtl:bg-gradient-to-l" />
+        <div aria-hidden className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-deep-950/90 to-transparent" />
+        <CircuitField onDark density={0.7} className="-z-10 opacity-70 [mask-image:linear-gradient(to_left,black,transparent_70%)] rtl:[mask-image:linear-gradient(to_right,black,transparent_70%)]" />
+        <Container className="pb-28 pt-14 sm:pt-16 lg:pb-32 lg:pt-20">
+          <div className="max-w-2xl">
+            <div className="wt-rise mb-8"><BrandLogo size={960} alt={d.meta.fullName} priority className="h-auto w-60 sm:w-80" /></div>
             <p className="wt-rise text-sm font-semibold text-royal-600">{h.heroEyebrow}</p>
             <h1 className="wt-rise mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-navy-900 sm:text-5xl lg:text-[3.6rem]" style={{ "--i": 1 } as React.CSSProperties}>{h.heroTitle}</h1>
             <p className="wt-rise mt-4 text-xl font-semibold text-cyan-600 sm:text-2xl" style={{ "--i": 2 } as React.CSSProperties}>{h.heroSubtitle}</p>
@@ -96,24 +119,21 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
               </dl>
             )}
           </div>
-          <div className="wt-rise" style={{ "--i": 2 } as React.CSSProperties}>
-            <HeroSlides slides={slides} labels={{ region: h.slidesLabel, pause: h.slidePause, play: h.slidePlay, go: h.slideGo }} />
-          </div>
         </Container>
       </section>
 
-      {/* 2 — Find your direction */}
+      {/* 2. Find your direction */}
       {tracks.length > 0 && (
-        <section className="bg-surface py-20 sm:py-28">
+        <section className="bg-surface/45 py-20 sm:py-28">
           <Container>
             <SectionHead eyebrow={h.directionEyebrow} title={h.directionTitle} href={p("/programs")} link={h.allPrograms} />
-            <ul className="grid gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+            <ul className="wt-stagger grid gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
               {tracks.slice(0, 8).map(([key, list], i) => {
                 const thumb = list.find((c) => c.thumbnail_url || c.cover_url);
                 return (
                   <li key={key}>
-                    <Link href={p(`/programs?category=${key}`)} className="group flex h-full overflow-hidden rounded-[24px] bg-white ring-1 ring-line transition-shadow sm:flex-col duration-300 hover:shadow-[var(--shadow-lift)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100">
-                      <span className="relative block w-28 shrink-0 overflow-hidden bg-navy-900 sm:aspect-[16/10] sm:w-auto">
+                    <Link href={p(`/programs?category=${key}`)} className="group flex h-full overflow-hidden rounded-[24px] bg-paper ring-1 ring-line transition-shadow sm:flex-col duration-300 hover:shadow-[var(--shadow-lift)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100">
+                      <span className="relative block w-28 shrink-0 overflow-hidden bg-deep-900 sm:aspect-[16/10] sm:w-auto">
                         {thumb && <Image src={(thumb.thumbnail_url ?? thumb.cover_url)!} alt="" fill sizes="(min-width:1024px) 25vw, (min-width:640px) 50vw, 112px" className="object-cover transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none" />}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col p-5 sm:p-6">
@@ -131,7 +151,7 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
               })}
               {tracks.length % 4 !== 0 && tracks.length < 8 && (
                 <li className="hidden lg:block">
-                  <Link href={p("/programs")} className="group flex h-full flex-col justify-end rounded-[24px] bg-navy-950 p-7 text-white transition-colors hover:bg-navy-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100">
+                  <Link href={p("/programs")} className="group flex h-full flex-col justify-end rounded-[24px] bg-deep-950 p-7 text-white transition-colors hover:bg-deep-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100">
                     <span className="text-2xl font-bold leading-snug">{h.allPrograms}</span>
                     <span className="mt-2 text-sm text-white/70">{h.programsN.replace("{n}", nf.format(courses.length))}</span>
                     <span className="mt-6 grid size-11 place-items-center rounded-full bg-cyan-500 text-navy-950 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1"><ArrowRight className="size-5 rtl:-scale-x-100" aria-hidden /></span>
@@ -143,14 +163,23 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </section>
       )}
 
-      {/* 3 — For schools */}
-      <section className="bg-white py-20 sm:py-28">
+      {/* 2b. Lab reel: short clips and photos from the lab, gliding in two rows */}
+      <section aria-label={h.reelTitle} className="dark-island relative isolate overflow-hidden bg-deep-950 py-20 sm:py-24">
+        <CircuitField onDark density={0.6} className="-z-10 opacity-60" />
+        <Container>
+          <SectionHead eyebrow={h.reelEyebrow} title={h.reelTitle} href={p("/gallery")} link={h.galleryAll} dark />
+        </Container>
+        <LabReel rows={reelRows} />
+      </section>
+
+      {/* 3. For schools */}
+      <section className="bg-paper/70 py-20 sm:py-28">
         <Container>
           <SectionHead eyebrow={h.schoolsEyebrow} title={h.schoolsHeadline} href={p("/schools")} link={h.schoolSolutions} />
-          <div className="grid gap-5 md:grid-cols-3">
+          <div className="wt-stagger grid gap-5 md:grid-cols-3">
             {schoolCards.map((c) => (
               <article key={c.t} className="flex flex-col overflow-hidden rounded-[24px] bg-surface ring-1 ring-line">
-                <div className="relative aspect-[16/10] bg-navy-900">{c.img && <Image src={c.img.url} alt={alt(c.img)} fill sizes="(min-width:768px) 33vw, 100vw" className="object-cover" />}</div>
+                <div className="relative aspect-[16/10] bg-deep-900">{c.img && <Image src={c.img.url} alt={alt(c.img)} fill sizes="(min-width:768px) 33vw, 100vw" className="object-cover" />}</div>
                 <div className="flex flex-1 flex-col p-7">
                   <c.icon className="size-6 text-royal-600" aria-hidden />
                   <h3 className="mt-4 text-xl font-bold text-navy-900">{c.t}</h3>
@@ -163,8 +192,8 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </Container>
       </section>
 
-      {/* 4 — Learning journey */}
-      <section className="border-y border-line bg-surface py-20 sm:py-28">
+      {/* 4. Learning journey */}
+      <section className="border-y border-line bg-surface/45 py-20 sm:py-28">
         <Container>
           <SectionHead eyebrow={h.journeyEyebrow} title={h.journeyHeadline} />
           <ol className="grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-3 lg:grid-cols-6">
@@ -179,14 +208,14 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </Container>
       </section>
 
-      {/* 5 — Interactive labs */}
+      {/* 5. Interactive labs */}
       {labs.length > 0 && (
-        <section className="bg-white py-20 sm:py-28">
+        <section className="bg-paper/70 py-20 sm:py-28">
           <Container>
             <SectionHead eyebrow={h.labsEyebrow} title={h.labsHeadline} href={p("/labs")} link={h.exploreLabs} />
-            <div className="grid gap-5 md:grid-cols-3">
+            <div className="wt-stagger grid gap-5 md:grid-cols-3">
               {labs.slice(0, 3).map((lab, i) => (
-                <Link key={lab.id} href={p(`/labs/${lab.slug}`)} className="group flex flex-col rounded-[24px] bg-navy-900 p-7 text-white ring-1 ring-navy-900 transition-colors hover:bg-navy-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100">
+                <Link key={lab.id} href={p(`/labs/${lab.slug}`)} className="group flex flex-col rounded-[24px] bg-deep-900 p-7 text-white ring-1 ring-deep-900 transition-colors hover:bg-deep-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-royal-100">
                   <span className="flex items-center justify-between">
                     <span className="font-latin text-sm font-semibold text-cyan-300 tabular-nums">{String(i + 1).padStart(2, "0")}</span>
                     <span className="rounded-full bg-white/10 px-2.5 py-1 font-latin text-xs font-semibold text-white/85">{PROVIDERS[lab.provider] ?? lab.provider}</span>
@@ -201,10 +230,10 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </section>
       )}
 
-      {/* 6 — Competitions & innovation (split) */}
-      <section className="bg-surface py-20 sm:py-28">
+      {/* 6. Competitions & innovation (split) */}
+      <section className="bg-surface/45 py-20 sm:py-28">
         <Container className="grid grid-cols-1 items-center gap-12 [&>*]:min-w-0 lg:grid-cols-2 lg:gap-20">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-[28px] bg-navy-900 ring-1 ring-line">
+          <div className="relative aspect-[4/3] overflow-hidden rounded-[28px] bg-deep-900 ring-1 ring-line">
             {compPhoto && <Image src={compPhoto} alt="" fill sizes="(min-width:1024px) 50vw, 100vw" className="object-cover object-top" />}
           </div>
           <div>
@@ -220,13 +249,13 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </Container>
       </section>
 
-      {/* 7 — Credentials (split, reversed) */}
-      <section className="bg-white py-20 sm:py-28">
+      {/* 7. Credentials (split, reversed) */}
+      <section className="bg-paper/70 py-20 sm:py-28">
         <Container className="grid grid-cols-1 items-center gap-12 [&>*]:min-w-0 lg:grid-cols-2 lg:gap-20">
           <div className="lg:order-2">
             <div className="mx-auto max-w-md rounded-[28px] bg-surface p-8 text-navy-900 ring-1 ring-line sm:p-10">
               <div className="flex items-center gap-4">
-                <Image src="/media/brand/logo-original-480.png" alt={d.meta.fullName} width={480} height={320} className="h-16 w-auto" />
+                <span className="shrink-0"><BrandLogo alt={d.meta.fullName} className="h-16 w-auto" /></span>
                 <p className="text-lg font-bold">{h.credCardTitle}</p>
               </div>
               <ul className="mt-8 space-y-4">
@@ -249,15 +278,15 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </Container>
       </section>
 
-      {/* 7b — Testimonials: only approved, featured reviews from verified learners/parents */}
+      {/* 7b: Testimonials: only approved, featured reviews from verified learners/parents */}
       {testimonials.length > 0 && (
-        <section className="bg-surface py-20 sm:py-28">
+        <section className="bg-surface/45 py-20 sm:py-28">
           <Container>
             <SectionHead eyebrow={d.community.testimonialsEyebrow} title={d.community.testimonialsTitle} />
-            <ul className="grid gap-5 md:grid-cols-3">
+            <ul className="wt-stagger grid gap-5 md:grid-cols-3">
               {testimonials.map((t) => (
                 <li key={t.id}>
-                  <figure className="flex h-full flex-col rounded-[24px] bg-white p-7 ring-1 ring-line">
+                  <figure className="flex h-full flex-col rounded-[24px] bg-paper p-7 ring-1 ring-line">
                     <span className="flex" role="img" aria-label={d.community.stars.replace("{n}", String(t.rating))}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`size-4 ${n <= t.rating ? "fill-amber-400 text-amber-400" : "text-line"}`} aria-hidden />)}</span>
                     <blockquote className="mt-4 flex-1 text-lg leading-relaxed text-navy-900" lang={t.locale}>{t.body}</blockquote>
                     <figcaption className="mt-6 border-t border-line pt-4 text-sm">
@@ -273,16 +302,16 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </section>
       )}
 
-      {/* 8 — Gallery */}
+      {/* 8. Gallery */}
       {gallery.length > 0 && (
-        <section className="bg-surface py-20 sm:py-28">
+        <section className="bg-surface/45 py-20 sm:py-28">
           <Container>
             <SectionHead eyebrow={h.galleryEyebrow} title={h.galleryHeadline} href={p("/gallery")} link={h.galleryAll} />
-            <ul className="grid grid-cols-2 gap-4 md:grid-cols-3">
+            <ul className="wt-stagger grid grid-cols-2 gap-4 md:grid-cols-3">
               {gallery.map((m) => (
                 <li key={m.id}>
                   <figure>
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-[20px] bg-navy-900">
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-[20px] bg-deep-900">
                       <Image src={m.url} alt={alt(m)} fill sizes="(min-width:768px) 33vw, 50vw" className="object-cover" />
                     </div>
                     {pick(m, "title", locale) && <figcaption className="mt-2 text-sm text-muted">{pick(m, "title", locale)}</figcaption>}
@@ -294,10 +323,11 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
         </section>
       )}
 
-      {/* 9 — Final call to action */}
-      <section className="bg-white py-20 sm:py-28">
+      {/* 9. Final call to action */}
+      <section className="bg-paper/70 py-20 sm:py-28">
         <Container>
-          <div className="rounded-[32px] bg-navy-950 px-8 py-16 text-center text-white sm:px-14 sm:py-20">
+          <div className="relative isolate overflow-hidden rounded-[32px] bg-deep-950 px-8 py-16 ring-1 ring-white/10 text-center text-white sm:px-14 sm:py-20">
+            <CircuitField onDark density={0.9} className="-z-10 [mask-image:radial-gradient(75%_90%_at_50%_50%,transparent_25%,black_80%)]" />
             <h2 className="mx-auto max-w-3xl text-3xl font-bold tracking-tight sm:text-5xl">{h.finalHeadline}</h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-white/75">{h.finalBody}</p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">

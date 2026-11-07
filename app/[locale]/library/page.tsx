@@ -36,7 +36,7 @@ export default async function Library({ params, searchParams }: PageProps<"/[loc
     <>
       <PageHeader title={c.libraryTitle} subtitle={c.librarySubtitle} />
       <Container className="py-10">
-        <form method="get" role="search" className="grid gap-3 rounded-2xl bg-white p-4 ring-1 ring-line sm:grid-cols-[repeat(3,1fr)_auto] sm:items-end">
+        <form method="get" role="search" className="grid gap-3 rounded-2xl bg-paper p-4 ring-1 ring-line sm:grid-cols-[repeat(3,1fr)_auto] sm:items-end">
           <div><Label htmlFor="category">{d.programs.category}</Label>
             <Select id="category" name="category" defaultValue={category ?? ""}><option value="">{d.common.all}</option>{CATS.map((x) => <option key={x} value={x}>{cats[x]}</option>)}</Select></div>
           <div><Label htmlFor="grade">{c.grade}</Label>
@@ -46,7 +46,7 @@ export default async function Library({ params, searchParams }: PageProps<"/[loc
           <Button type="submit">{d.common.filter}</Button>
         </form>
         {items.length === 0 ? <div className="mt-8"><EmptyState title={c.libraryEmpty} /></div> : (
-          <ul className="mt-8 divide-y divide-line overflow-hidden rounded-[24px] bg-white ring-1 ring-line">
+          <ul className="wt-stagger mt-8 divide-y divide-line overflow-hidden rounded-[24px] bg-paper ring-1 ring-line">
             {items.map((r) => {
               const Icon = icons[r.kind as keyof typeof icons] ?? FileText;
               const meta = [kinds[r.kind], r.category ? cats[r.category] : null, grades(r.grade_min, r.grade_max)].filter(Boolean).join(" · ");
@@ -59,7 +59,7 @@ export default async function Library({ params, searchParams }: PageProps<"/[loc
                     <p className="mt-1.5 text-xs text-subtle">{meta}{r.course_slug && <> · <Link className="text-royal-600 underline underline-offset-2" href={`/${locale}/programs/${r.course_slug}`}>{pick({ title_en: r.course_title_en ?? "", title_ar: r.course_title_ar ?? "" }, "title", locale)}</Link></>}</p>
                   </div>
                   {r.unlocked && r.url ? (
-                    <a href={r.url} target={r.url.startsWith("/") ? undefined : "_blank"} rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-royal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-royal-700">
+                    <a href={r.url} target={r.url.startsWith("/") ? undefined : "_blank"} rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-action px-4 py-2 text-sm font-semibold text-white hover:bg-action-hover">
                       {c.open}<ArrowUpRight className="size-4 rtl:-scale-x-100" aria-hidden /><span className="sr-only">: {pick(r, "title", locale)}</span>
                     </a>
                   ) : r.access === "registered" ? (

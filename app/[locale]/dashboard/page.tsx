@@ -59,13 +59,13 @@ export default async function StudentDashboard({ params, searchParams }: PagePro
             {rows.length === 0 ? (
               <EmptyState title={d.dashboard.noCourses} action={<ButtonLink href={`/${locale}/programs`}>{d.dashboard.browse}</ButtonLink>} />
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="wt-stagger grid gap-4 sm:grid-cols-2">
                 {rows.map((r) => {
                   const pct = pmap.get(r.course_id) ?? 0;
                   const learnable = ["active", "completed"].includes(r.status);
                   return (
                     <Card key={r.id} className="flex gap-4 p-4">
-                      <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-navy-900">{r.courses.thumbnail_url && <Image src={r.courses.thumbnail_url} alt="" fill sizes="80px" className="object-cover" />}</div>
+                      <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-deep-900">{r.courses.thumbnail_url && <Image src={r.courses.thumbnail_url} alt="" fill sizes="80px" className="object-cover" />}</div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-bold text-navy-900">{pick(r.courses, "title", locale)}</p>
                         <Badge tone={r.status === "completed" ? "success" : r.status === "active" ? "blue" : "warning"} className="mt-1">{d.enums.enrollment[r.status as keyof typeof d.enums.enrollment]}</Badge>
@@ -128,7 +128,7 @@ export default async function StudentDashboard({ params, searchParams }: PagePro
           {recs.length > 0 && (
             <section>
               <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-navy-900"><Sparkles className="size-5 text-cyan-600" aria-hidden />{d.dashboard.recommendations}</h2>
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{recs.map((c) => <CourseCard key={c.id} c={c} locale={locale} d={d} />)}</div>
+              <div className="wt-stagger grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{recs.map((c) => <CourseCard key={c.id} c={c} locale={locale} d={d} />)}</div>
             </section>
           )}
         </div>

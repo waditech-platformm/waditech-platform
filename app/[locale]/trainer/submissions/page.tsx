@@ -47,7 +47,7 @@ export default async function TrainerSubmissions({ params }: PageProps<"/[locale
               <input type="hidden" name="attempt_id" value={t.id} />
               {t.assessment_answers.filter((a) => a.questions.kind === "short_answer" && a.points_awarded === null).map((a) => (
                 <div key={a.question_id} className="grid gap-2 rounded-xl bg-surface p-3 sm:grid-cols-[1fr_120px] sm:items-end">
-                  <div><p className="text-sm font-semibold">{pick(a.questions, "prompt", locale)}</p><p className="mt-1 text-sm" dir="auto">{a.text_answer || "—"}</p></div>
+                  <div><p className="text-sm font-semibold">{pick(a.questions, "prompt", locale)}</p><p className="mt-1 text-sm" dir="auto">{a.text_answer || "-"}</p></div>
                   <div><Label htmlFor={`p-${t.id}-${a.question_id}`}>{d.trainer.points} / {a.questions.points}</Label><Input id={`p-${t.id}-${a.question_id}`} name={`p_${a.question_id}`} type="number" min={0} max={a.questions.points} step="0.5" required /></div>
                 </div>
               ))}

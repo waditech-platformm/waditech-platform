@@ -28,7 +28,7 @@ export default async function AdminCompetitions({ params, searchParams }: PagePr
         {list.map((c) => (
           <tr key={c.id}>
             <Td className="font-semibold">{pick(c, "title", locale)} <DemoBadge show={c.is_test_data} label={d.common.demoBadge} /></Td>
-            <Td>{c.registration_deadline ? formatDate(c.registration_deadline, locale) : "—"}</Td>
+            <Td>{c.registration_deadline ? formatDate(c.registration_deadline, locale) : "-"}</Td>
             <Td><Badge tone={toneFor(c.status)}>{c.status}</Badge></Td>
             <Td><Link className="text-sm font-semibold text-royal-600" href={`/${locale}/admin/competitions?edit=${c.id}`}>{a.editItem}</Link></Td>
           </tr>
@@ -60,7 +60,7 @@ export default async function AdminCompetitions({ params, searchParams }: PagePr
           {teamRows.map((t) => (
             <tr key={t.id}>
               <Td className="font-semibold">{t.name}<div className="text-xs text-subtle">{t.profiles?.full_name}</div></Td>
-              <Td>{t.competitions ? pick(t.competitions, "title", locale) : "—"}</Td>
+              <Td>{t.competitions ? pick(t.competitions, "title", locale) : "-"}</Td>
               <Td className="text-xs">{Array.isArray(t.members) ? t.members.length : 0}</Td>
               <Td>
                 <ActionForm action={A.setTeamStatusAction} className="flex gap-1">

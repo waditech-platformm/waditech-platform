@@ -4,7 +4,7 @@ import { env } from "@/lib/env";
 import type { PaymentProvider, VerifiedResult } from "./types";
 
 /**
- * SANDBOX provider — simulates a hosted payment page. A checkout id is an HMAC-signed token
+ * SANDBOX provider: simulates a hosted payment page. A checkout id is an HMAC-signed token
  * (order id, amount, currency, expiry) so the client can't forge one for a different amount.
  * Disabled automatically when APP_ENV=production.
  */

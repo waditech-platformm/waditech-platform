@@ -22,7 +22,7 @@ export default async function AdminLayout({ children, params }: LayoutProps<"/[l
   ] : [{ href: `/${locale}/trainer`, label: d.trainer.title }];
   return (
     <div>
-      <div className="border-b border-line bg-white"><Container className="pt-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-royal-600">{d.admin.title}</p><PortalNav items={nav} /></Container></div>
+      <div className="border-b border-line bg-paper"><Container className="pt-6"><p className="text-xs font-bold uppercase tracking-[0.18em] text-royal-600">{d.admin.title}</p><PortalNav items={nav} /></Container></div>
       <Container className="py-8">{children}</Container>
     </div>
   );

@@ -102,5 +102,19 @@ export async function contactAction(_: ActionResult | null, fd: FormData): Promi
   // validated server-side, then inserted with the service role (the table has no public insert policy)
   const { error } = await createAdminClient().from("contact_messages").insert({ ...row, locale });
   if (error) return { ok: false, error: d.errors.generic };
+  /*
+   * TODO(launch): EMAIL. Messages are saved and visible in /admin/messages, but nobody is emailed.
+   * To make the form email the office:
+   *   1. Pick a provider and set it in Vercel env (see server/email/index.ts):
+   *        EMAIL_PROVIDER=resend + RESEND_API_KEY, or EMAIL_PROVIDER=smtp + SMTP_URL
+   *        EMAIL_FROM="WadiTech Academy <no-reply@waditech.co>" (domain must be verified with the provider: SPF + DKIM)
+   *   2. Add CONTACT_INBOX (e.g. info@waditech.co) to lib/env.ts and Vercel env.
+   *   3. Here, after the insert, send a short staff alert (name, topic, first 300 chars, link to /admin/messages):
+   *        await emailProvider().send({ to: env().CONTACT_INBOX, subject, html, text }).catch(logOnly)
+   *      Never fail the visitor's request if email fails; the message is already saved.
+   *   4. Optional: send the visitor a "we got your message" receipt in their language.
+   *   5. "Add your school" requests arrive here with topic=schools; route them to the partnerships inbox the same way.
+   * Requires SUPABASE_SERVICE_ROLE_KEY on the server (the insert above uses it); it is set on Vercel, not in local .env.local.
+   */
   return { ok: true, message: d.contact.sent };
 }

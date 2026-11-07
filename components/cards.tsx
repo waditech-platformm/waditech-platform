@@ -37,13 +37,13 @@ export function CourseStatsLine({ s, d, locale, className = "" }: { s?: CardStat
 
 export function CourseCard({ c, locale, d, stats }: { c: Course; locale: Locale; d: Dict; stats?: CardStats }) {
   return (
-    <Link href={`/${locale}/programs/${c.slug}`} className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-white ring-1 ring-line shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-lift)]">
-      <div className="relative aspect-[16/10] overflow-hidden bg-navy-900">
+    <Link href={`/${locale}/programs/${c.slug}`} className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-paper ring-1 ring-line shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-lift)]">
+      <div className="relative aspect-[16/10] overflow-hidden bg-deep-900">
         {c.thumbnail_url || c.cover_url ? (
           <Image src={(c.thumbnail_url || c.cover_url)!} alt="" fill sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw" className="object-cover transition duration-500 group-hover:scale-105" />
         ) : <div className="bg-neural absolute inset-0" />}
         <div className="absolute inset-x-3 top-3 flex flex-wrap gap-1.5">
-          <Badge tone="dark" className="bg-navy-900/80 backdrop-blur">{d.enums.category[c.category as keyof Dict["enums"]["category"]]}</Badge>
+          <Badge tone="dark" className="bg-deep-900/80 backdrop-blur">{d.enums.category[c.category as keyof Dict["enums"]["category"]]}</Badge>
           <DemoBadge show={c.is_test_data} label={d.common.demoBadge} />
         </div>
       </div>
@@ -69,8 +69,8 @@ export function CourseCard({ c, locale, d, stats }: { c: Course; locale: Locale;
 
 export function NewsCard({ a, locale, d }: { a: Article; locale: Locale; d: Dict }) {
   return (
-    <Link href={`/${locale}/news/${a.slug}`} className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-white ring-1 ring-line shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-lift)]">
-      <div className="relative aspect-[16/9] bg-navy-900">
+    <Link href={`/${locale}/news/${a.slug}`} className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-paper ring-1 ring-line shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-lift)]">
+      <div className="relative aspect-[16/9] bg-deep-900">
         {a.cover_url && <Image src={a.cover_url} alt="" fill sizes="(min-width:1024px) 33vw, 100vw" className="object-cover" />}
       </div>
       <div className="flex flex-1 flex-col p-5">
@@ -88,8 +88,8 @@ export function NewsCard({ a, locale, d }: { a: Article; locale: Locale; d: Dict
 export function EventCard({ e, locale, d }: { e: EventRow; locale: Locale; d: Dict }) {
   const date = new Date(e.starts_at);
   return (
-    <Link href={`/${locale}/events/${e.slug}`} className="group flex gap-4 rounded-[var(--radius-card)] bg-white p-4 ring-1 ring-line shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-lift)]">
-      <div className="grid w-16 shrink-0 place-items-center rounded-xl bg-navy-900 py-2 text-center text-white">
+    <Link href={`/${locale}/events/${e.slug}`} className="group flex gap-4 rounded-[var(--radius-card)] bg-paper p-4 ring-1 ring-line shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-lift)]">
+      <div className="grid w-16 shrink-0 place-items-center rounded-xl bg-deep-900 py-2 text-center text-white">
         <span className="text-[11px] font-bold uppercase tracking-wide text-cyan-300">{formatDate(date, locale, { month: "short" })}</span>
         <span className="text-2xl font-extrabold leading-none">{formatDate(date, locale, { day: "numeric" })}</span>
       </div>

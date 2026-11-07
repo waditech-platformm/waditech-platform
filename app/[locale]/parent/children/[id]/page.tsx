@@ -29,7 +29,7 @@ export default async function ChildPage({ params }: PageProps<"/[locale]/parent/
   const available = (await listCourses({ availability: "open" })).filter((c) => !rows.some((r) => r.course_id === c.id && !["cancelled", "refunded"].includes(r.status)));
   return (
     <PortalShell title={child?.full_name ?? ""} subtitle={d.parent.viewProgress} nav={[{ href: `/${locale}/parent`, label: d.parent.children, exact: true }]}>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="wt-stagger grid gap-6 lg:grid-cols-2">
         <Card className="p-5"><h2 className="font-bold text-navy-900">{d.parent.enrollments}</h2>
           <ul className="mt-3 space-y-4">{rows.map((r) => (
             <li key={r.id}><div className="flex items-center justify-between gap-2"><span className="font-semibold">{pick(r.courses, "title", locale)}</span><Badge tone={r.status === "completed" ? "success" : r.status === "active" ? "blue" : "warning"}>{d.enums.enrollment[r.status as keyof typeof d.enums.enrollment]}</Badge></div>

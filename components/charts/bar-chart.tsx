@@ -17,7 +17,7 @@ function niceMax(v: number) {
 
 export function BarChart({ data, title, format = (n) => String(n), height = 180, labelEvery = 1, width = 600 }: {
   data: Datum[]; title: string; format?: (n: number) => string; height?: number; labelEvery?: number;
-  /** viewBox width — match the card's rendered width so text keeps a constant size */ width?: number;
+  /** viewBox width: match the card's rendered width so text keeps a constant size */ width?: number;
 }) {
   const W = width, H = height, padL = 36, padR = 8, padT = 10, padB = 26;
   const max = niceMax(Math.max(0, ...data.map((d) => d.value)));

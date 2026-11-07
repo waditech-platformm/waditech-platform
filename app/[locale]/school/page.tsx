@@ -36,7 +36,7 @@ export default async function SchoolPortal({ params, searchParams }: PageProps<"
           {o.students.map((s) => (
             <tr key={s.id}><Td className="font-semibold">{s.full_name}</Td><Td>{s.enrollments}</Td>
               <Td className="w-40"><ProgressBar value={s.avg_progress ?? 0} label={d.school.avgProgress} /><span className="text-xs text-subtle">{s.avg_progress ?? 0}%</span></Td>
-              <Td>{s.attendance_rate ?? "—"}{s.attendance_rate !== null && "%"}</Td><Td>{s.certificates}</Td></tr>
+              <Td>{s.attendance_rate ?? "-"}{s.attendance_rate !== null && "%"}</Td><Td>{s.certificates}</Td></tr>
           ))}
         </Table>
         <div className="space-y-6">

@@ -16,9 +16,9 @@ export default async function Competitions({ params }: PageProps<"/[locale]/comp
       <PageHeader title={d.competitions.title} subtitle={d.competitions.subtitle} />
       <Container className="py-10">
         {items.length === 0 ? <EmptyState title={d.common.emptyTitle} /> : (
-          <div className="grid gap-6 md:grid-cols-2">{items.map((c) => (
-            <Link key={c.id} href={`/${locale}/competitions/${c.slug}`} className="group overflow-hidden rounded-[var(--radius-card)] bg-white ring-1 ring-line shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-lift)]">
-              <div className="relative aspect-[16/8] bg-navy-900">{c.cover_url && <Image src={c.cover_url} alt="" fill sizes="50vw" className="object-cover" />}</div>
+          <div className="wt-stagger grid gap-6 md:grid-cols-2">{items.map((c) => (
+            <Link key={c.id} href={`/${locale}/competitions/${c.slug}`} className="group overflow-hidden rounded-[var(--radius-card)] bg-paper ring-1 ring-line shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-lift)]">
+              <div className="relative aspect-[16/8] bg-deep-900">{c.cover_url && <Image src={c.cover_url} alt="" fill sizes="50vw" className="object-cover" />}</div>
               <div className="p-5">
                 <div className="flex gap-2"><Badge tone={c.status === "open" ? "success" : "neutral"}>{d.competitions.compStatus[c.status as keyof typeof d.competitions.compStatus]}</Badge><DemoBadge show={c.is_test_data} label={d.common.demoBadge} /></div>
                 <h2 className="mt-2 text-lg font-bold text-navy-900 group-hover:text-royal-700">{pick(c, "title", locale)}</h2>

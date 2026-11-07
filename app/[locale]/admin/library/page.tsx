@@ -47,8 +47,8 @@ export default async function AdminLibrary({ params, searchParams }: PageProps<"
           <AreaField name="description_ar" label={a.summaryAr} defaultValue={editing?.description_ar} rows={2} dir="rtl" />
           <SelectField name="kind" label={c.kind} defaultValue={editing?.kind ?? "pdf"} options={Object.entries(kinds)} />
           <TextField name="url" label="URL" defaultValue={editing?.url} required dir="ltr" placeholder="https://… or /media/…" />
-          <SelectField name="category" label={a.category} defaultValue={editing?.category ?? ""} options={[["", "—"], ...CATS.map((x) => [x, cats[x]] as [string, string])]} />
-          <SelectField name="course_id" label={a.course} defaultValue={editing?.course_id ?? ""} options={[["", "—"], ...(courses ?? []).map((x) => [x.id, pick(x, "title", locale)] as [string, string])]} />
+          <SelectField name="category" label={a.category} defaultValue={editing?.category ?? ""} options={[["", "-"], ...CATS.map((x) => [x, cats[x]] as [string, string])]} />
+          <SelectField name="course_id" label={a.course} defaultValue={editing?.course_id ?? ""} options={[["", "-"], ...(courses ?? []).map((x) => [x.id, pick(x, "title", locale)] as [string, string])]} />
           <TextField name="grade_min" label={a.gradeMin} type="number" min={1} max={12} defaultValue={editing?.grade_min} />
           <TextField name="grade_max" label={a.gradeMax} type="number" min={1} max={12} defaultValue={editing?.grade_max} />
           <SelectField name="access" label={a.access} defaultValue={editing?.access ?? "public"} options={Object.entries(access)} />

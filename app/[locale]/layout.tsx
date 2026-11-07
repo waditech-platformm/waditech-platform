@@ -10,9 +10,17 @@ import { getViewer } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { breakingNews } from "@/features/content/queries";
 import { AnnouncementBar } from "@/components/layout/announcement-bar";
+import { navTracks, partnerSchools } from "@/features/navigation/queries";
+import { CircuitField } from "@/components/circuit-field";
 import { env } from "@/lib/env";
+import { cookies } from "next/headers";
 
-export const viewport: Viewport = { themeColor: "#0A1A36", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = {
+  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#ffffff" }, { media: "(prefers-color-scheme: dark)", color: "#071224" }],
+  width: "device-width",
+  initialScale: 1,
+};
+// No saved theme -> no data-theme attribute, and globals.css follows the OS (prefers-color-scheme).
 
 export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Promise<Metadata> {
   const { locale } = await params;
@@ -47,12 +55,17 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
     const { count } = await s.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", viewer.id).is("read_at", null);
     unread = count ?? 0;
   }
-  const breaking = await breakingNews();
+  const [breaking, tracks, schools] = await Promise.all([breakingNews(), navTracks(), partnerSchools()]);
   const showDemo = env().APP_ENV !== "production";
+  const saved = (await cookies()).get("wt_theme")?.value;
+  const theme = saved === "dark" || saved === "light" ? saved : undefined;
   return (
-    <html lang={locale} dir={dirOf(locale)}>
+    // suppressHydrationWarning: the theme toggle changes data-theme on the client
+    <html lang={locale} dir={dirOf(locale)} data-theme={theme} suppressHydrationWarning>
       <body className="min-h-dvh antialiased">
-        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-semibold">{dict.common.skipToContent}</a>
+        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-paper focus:px-4 focus:py-2 focus:font-semibold">{dict.common.skipToContent}</a>
+        {/* site-wide animated circuit layer: fixed behind every page, shows through the translucent sections */}
+        <div aria-hidden className="no-print pointer-events-none fixed inset-0 -z-10"><CircuitField global density={0.55} cell={34} /></div>
         <I18nProvider dict={dict} locale={locale}>
           {showDemo && (
             <div className="no-print bg-warning-bg px-4 py-1.5 text-center text-xs font-semibold text-warning" role="note">{dict.common.demoBanner}</div>
@@ -60,7 +73,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
           {breaking && (
             <AnnouncementBar id={breaking.slug} href={`/${locale}/news/${breaking.slug}`} label={dict.home.breaking} title={locale === "ar" ? breaking.title_ar : breaking.title_en} dismissLabel={dict.home.dismiss} />
           )}
-          <div className="no-print"><SiteHeader locale={locale} dict={dict} viewer={viewer} unread={unread} /></div>
+          <div className="no-print"><SiteHeader locale={locale} dict={dict} viewer={viewer} unread={unread} tracks={tracks} schools={schools} /></div>
           <main id="main">{children}</main>
           <div className="no-print"><SiteFooter locale={locale} dict={dict} /></div>
         </I18nProvider>

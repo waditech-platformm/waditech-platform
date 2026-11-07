@@ -27,13 +27,13 @@ export default async function AdminAnalytics({ params }: PageProps<"/[locale]/ad
   return (
     <div className="space-y-6">
       <AdminTitle title={a.analytics} subtitle={a.analyticsNote} />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="wt-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label={a.quizPassRate} value={`${nf.format(passRate)}%`} hint={`${nf.format(s.quiz.passed)} / ${nf.format(s.quiz.attempts)}`} />
-        <Stat label={a.avgQuizScore} value={s.quiz.avg_score === null ? "—" : `${nf.format(Number(s.quiz.avg_score))}%`} />
+        <Stat label={a.avgQuizScore} value={s.quiz.avg_score === null ? "-" : `${nf.format(Number(s.quiz.avg_score))}%`} />
         <Stat label={a.emailDelivery} value={nf.format(s.email.sent)} hint={`${a.emailSent} · ${nf.format(s.email.queued)} ${a.emailQueued} · ${nf.format(s.email.failed)} ${a.emailFailed}`} />
         <Stat label={a.usdNote} value={formatMoney(usdTotal, "USD", locale)} />
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="wt-stagger grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <h2 className="mb-3 font-bold text-navy-900">{a.enrollmentsPerWeek}</h2>
           <BarChart title={a.enrollmentsPerWeek} labelEvery={2} format={(n) => nf.format(n)}
