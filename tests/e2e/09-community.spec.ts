@@ -8,7 +8,7 @@ test("trainers page lists only published profiles, each with their real programs
   await page.getByRole("link", { name: /Lina \(demo\)/ }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lina (demo)");
   const taught = await db<{ n: number }>("select count(*)::int n from course_instructors ci join courses c on c.id = ci.course_id and c.status = 'published' where ci.trainer_id = '00000000-0000-4000-a000-000000000003'");
-  await expect(page.locator('a[href^="/en/programs/"]')).toHaveCount(taught[0].n);
+  await expect(page.locator('main a[href^="/en/programs/"]')).toHaveCount(taught[0].n); // not the header menu
   // and the program page links back to the profile
   await page.goto("/en/programs/robotics-foundations");
   await expect(page.getByRole("link", { name: /Lina \(demo\)/ })).toHaveAttribute("href", "/en/trainers/demo-lina");

@@ -7,7 +7,7 @@ test("visitor registers, verifies email and lands in the student dashboard", asy
   const email = `e2e-student-${stamp}@test.local`;
   await page.goto("/en/register");
   await page.locator('input[name="full_name"]').fill("E2E Test Student");
-  await page.locator('input[name="email"]').fill(email);
+  await page.locator('main input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill("Strong-Pass-42");
   await page.locator('input[name="confirm"]').fill("Strong-Pass-42");
   await page.locator('input[name="terms"]').check();
@@ -16,7 +16,7 @@ test("visitor registers, verifies email and lands in the student dashboard", asy
 
   // Unverified accounts cannot sign in
   await page.goto("/en/login");
-  await page.locator('input[name="email"]').fill(email);
+  await page.locator('main input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill("Strong-Pass-42");
   await page.locator('form button[type="submit"]').click();
   await expect(page).toHaveURL(/login/);
@@ -31,7 +31,7 @@ test("password recovery sends a reset link and the new password works", async ({
   const email = `e2e-reset-${stamp}@test.local`;
   await page.goto("/en/register");
   await page.locator('input[name="full_name"]').fill("E2E Reset User");
-  await page.locator('input[name="email"]').fill(email);
+  await page.locator('main input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill("Old-Pass-123");
   await page.locator('input[name="confirm"]').fill("Old-Pass-123");
   await page.locator('input[name="terms"]').check();
@@ -41,7 +41,7 @@ test("password recovery sends a reset link and the new password works", async ({
   await page.context().clearCookies();
 
   await page.goto("/en/forgot-password");
-  await page.locator('input[name="email"]').fill(email);
+  await page.locator('main input[name="email"]').fill(email);
   await page.locator('form button[type="submit"]').click();
   await page.goto(await latestMailLink(email, "type=recovery"));
   await expect(page).toHaveURL(/reset-password/);
@@ -80,7 +80,7 @@ test("repeated failed sign-ins are rate limited", async ({ page }) => {
   await db("delete from public.rate_limits where bucket like 'login:%'");
   await page.goto("/en/login");
   for (let i = 0; i < 9; i++) {
-    await page.locator('input[name="email"]').fill("nobody@test.local");
+    await page.locator('main input[name="email"]').fill("nobody@test.local");
     await page.locator('input[name="password"]').fill(`wrong-${i}`);
     await page.locator('form button[type="submit"]').click();
     await page.waitForTimeout(250);

@@ -8,18 +8,28 @@ test("track cards link to filtered programs and show real counts", async ({ page
   await robotics.click();
   await expect(page).toHaveURL(/category=robotics/);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const cards = page.locator('a[href^="/en/programs/"]');
+  const cards = page.locator('main a[href^="/en/programs/"]'); // not the header menu's program links
   await expect(cards.first()).toBeVisible();
   expect(new Set(await cards.evaluateAll((a) => a.map((x) => x.getAttribute("href")))).size).toBe(shown);
 });
 
-test("hero slideshow can be paused and navigated by number", async ({ page }) => {
+test("hero photo background can be paused and navigated by caption", async ({ page }) => {
   await page.goto("/en");
   const region = page.getByRole("region", { name: "Photos from WadiTech" });
   await region.getByRole("button", { name: "Pause slideshow" }).click();
   await expect(region.getByRole("button", { name: "Play slideshow" })).toBeVisible();
-  await region.getByRole("button", { name: "Show photo 02" }).click();
-  await expect(region.getByRole("button", { name: "Show photo 02" })).toHaveAttribute("aria-current", "true");
+  // captions are the buttons' names (WCAG 2.5.3)
+  await region.getByRole("button", { name: "Heavy-lift drone build" }).click();
+  await expect(region.getByRole("button", { name: "Heavy-lift drone build" })).toHaveAttribute("aria-current", "true");
+});
+
+test("lab reel plays muted inline clips", async ({ page }) => {
+  await page.goto("/en");
+  const reel = page.locator(".wt-marquee");
+  await reel.scrollIntoViewIfNeeded();
+  const v = reel.locator("video").first();
+  await expect(v).toHaveJSProperty("muted", true);
+  await expect(v).toHaveAttribute("playsinline", "");
 });
 
 test("More menu is a keyboard-operable disclosure", async ({ page }) => {

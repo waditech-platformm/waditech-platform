@@ -6,6 +6,7 @@ import { Container } from "@/components/ui/primitives";
 import { BrandLogo } from "@/components/brand-logo";
 import { ContactForm } from "@/features/engagement/contact-form";
 import { LocationMap, ACADEMY_LOCATION } from "./location-map";
+import { FooterMessage } from "./footer-message";
 
 export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dict }) {
   const p = (s: string) => `/${locale}${s}`;
@@ -31,13 +32,15 @@ export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dict }) {
             </div>
             <a href={ACADEMY_LOCATION.mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm font-semibold text-royal-600 hover:underline">{f.openInMaps}</a>
           </div>
-          <div className="wt-reveal">
-            <h2 className="text-xl font-bold text-navy-900">{f.messageTitle}</h2>
-            <p className="mt-2 text-sm">{f.messageBody}</p>
-            <div className="mt-5 rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
-              <ContactForm compact idPrefix="footer-contact" />
+          <FooterMessage>
+            <div className="wt-reveal">
+              <h2 className="text-xl font-bold text-navy-900">{f.messageTitle}</h2>
+              <p className="mt-2 text-sm">{f.messageBody}</p>
+              <div className="mt-5 rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
+                <ContactForm compact idPrefix="footer-contact" />
+              </div>
             </div>
-          </div>
+          </FooterMessage>
         </Container>
       </section>
 

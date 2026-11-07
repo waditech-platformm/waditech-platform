@@ -2,8 +2,9 @@ import { expect, test } from "@playwright/test";
 
 test("visitor opens the homepage with the official imagery and hero", async ({ page }) => {
   await page.goto("/en");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Empowering the Next Generation of Innovators");
-  for (const src of ["lab-entrance", "logo-original", "lab-classroom"]) {
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Kids in Amman build robots, code and AI here.");
+  // hero lab photo (first slide), the official logo, and the lab photo in the schools section
+  for (const src of ["lab-room", "logo-original", "lab-classroom"]) {
     await expect(page.locator(`img[src*="${src}"]`).first()).toBeAttached();
   }
   await expect(page.locator('a[href="/en/programs"]').first()).toBeVisible();
@@ -11,11 +12,12 @@ test("visitor opens the homepage with the official imagery and hero", async ({ p
 
 test("visitor browses and filters programs, then opens a program page", async ({ page }) => {
   await page.goto("/en/programs");
-  const cards = page.locator('a[href^="/en/programs/"]');
+  // scoped to <main>: the header Programs menu also links to program pages
+  const cards = page.locator('main a[href^="/en/programs/"]');
   const all = await cards.count();
   expect(all).toBeGreaterThan(3);
   await page.goto("/en/programs?category=robotics");
-  const filtered = await page.locator('a[href^="/en/programs/"]').count();
+  const filtered = await page.locator('main a[href^="/en/programs/"]').count();
   expect(filtered).toBeLessThan(all);
   await page.goto("/en/programs/python-for-young-coders");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Python");
